@@ -1,0 +1,6 @@
+.vs
+obj
+bin
+*.user
+/packages
+ifmIoTCore.Visualizer.Tests/TestReports/

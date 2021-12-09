@@ -1,1 +1,1 @@
-# iot-core
+.NET IoTCore implementation
