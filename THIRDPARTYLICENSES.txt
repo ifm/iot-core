@@ -1,0 +1,12 @@
+Nuget Package Name                                Version               License Url
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+AutoMapper                                        {10.1.1}              https://licenses.nuget.org/MIT                                                        
+CommandLineParser                                 {2.8.0}               https://www.nuget.org/packages/CommandLineParser/2.8.0/License
+log4net                                           {2.0.13}              https://licenses.nuget.org/Apache-2.0                                                 
+MQTTnet                                           {3.1.0}               https://www.nuget.org/packages/MQTTnet/3.1.0/License
+MSBuildTasks                                      {1.5.0.235}           http://opensource.org/licenses/bsd-license.php                                        
+NETStandard.Library                               {2.0.3}               https://github.com/dotnet/standard/blob/master/LICENSE.TXT                            
+Newtonsoft.Json                                   {13.0.1}              https://licenses.nuget.org/MIT                                                        
+RestSharp                                         {106.11.7}            https://licenses.nuget.org/Apache-2.0                                                 
+TextCopy                                          {4.3.0}               https://licenses.nuget.org/MIT                                                        
+Tmds.DBus                                         {0.9.1}               https://licenses.nuget.org/MIT                                                        
