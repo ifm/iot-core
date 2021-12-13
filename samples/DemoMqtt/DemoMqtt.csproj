@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <Platforms>AnyCPU</Platforms>
+    <TargetFramework>net472</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\source\ifmIoTCore.Converter.Json\ifmIoTCore.Converter.Json.csproj" />
+    <ProjectReference Include="..\..\source\ifmIoTCore.Logging.Log4Net\ifmIoTCore.Logging.Log4Net.csproj" />
+    <ProjectReference Include="..\..\source\ifmIoTCore.NetAdapter.Http\ifmIoTCore.NetAdapter.Http.csproj" />
+    <ProjectReference Include="..\..\source\ifmIoTCore.NetAdapter.Mqtt\ifmIoTCore.NetAdapter.Mqtt.csproj" />
+    <ProjectReference Include="..\..\source\ifmIoTCore\ifmIoTCore.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="log4net">
+      <Version>2.0.12</Version>
+    </PackageReference>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies">
+      <Version>1.0.0</Version>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+</Project>

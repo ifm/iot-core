@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net5.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommandLineParser" Version="2.8.0" />
+    <PackageReference Include="ifmIoTCore" Version="1.4.12396" />
+    <PackageReference Include="ifmIoTCore.Converter.Json" Version="1.4.12395" />
+    <PackageReference Include="ifmIoTCore.NetAdapter.Http" Version="1.4.12397" />
+    <PackageReference Include="ifmIoTCore.Profiles.Device" Version="1.4.12395" />
+    <PackageReference Include="ifmIoTCore.Profiles.IoddExtender" Version="1.4.12398" />
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="6.0.0" />
+  </ItemGroup>
+
+</Project>

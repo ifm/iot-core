@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "IoTCoreStressTester": {
+      "commandName": "Project",
+      "commandLineArgs": "-i id0 -h http://192.168.0.100:8090 --mirror1-uri http://192.168.0.240"
+    }
+  }
+}

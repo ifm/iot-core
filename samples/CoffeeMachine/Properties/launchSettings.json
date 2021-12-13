@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "CoffeeMachine": {
+      "commandName": "Project",
+      "commandLineArgs": "-i id1 -u http://127.0.0.1:8090"
+    }
+  }
+}

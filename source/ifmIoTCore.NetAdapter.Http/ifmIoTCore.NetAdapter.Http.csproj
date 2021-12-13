@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <AssemblyVersion>2.0.19</AssemblyVersion>
+    <Version>2.0.19-beta</Version>
+    <Company>ifm ecomatic gmbh</Company>
+    <Copyright>Copyright © ifm ecomatic gmbh. All rights reserved.</Copyright>
+    <LangVersion>8</LangVersion>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="Resources\full.ifm-iot-browser-config.html.gz" />
+    <None Remove="Resources\full.ifm-iot-core-visualizer.html.gz" />
+    <None Remove="Resources\iotcorebrowser.gz" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\full.ifm-iot-core-visualizer.html.gz" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ifmIoTCore\ifmIoTCore.csproj" />
+  </ItemGroup>
+</Project>

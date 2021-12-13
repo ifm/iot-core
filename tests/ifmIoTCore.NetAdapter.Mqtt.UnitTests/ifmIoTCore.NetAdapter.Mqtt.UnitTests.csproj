@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net48;net5.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+    <LangVersion>8</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MQTTnet" Version="3.1.0" />
+    <PackageReference Include="nunit" Version="3.13.2" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.11.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\source\ifmIoTCore.Converter.Json\ifmIoTCore.Converter.Json.csproj" />
+    <ProjectReference Include="..\..\source\ifmIoTCore.Logging.Log4Net\ifmIoTCore.Logging.Log4Net.csproj" />
+    <ProjectReference Include="..\..\source\ifmIoTCore.NetAdapter.Mqtt\ifmIoTCore.NetAdapter.Mqtt.csproj" />
+  </ItemGroup>
+
+</Project>
