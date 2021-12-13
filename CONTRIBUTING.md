@@ -7,9 +7,6 @@ Contributing is not limited to writing code and submitting a PR. Feel free to su
 
 Of course, contributing code is more than welcome! If you're planning to submit a PR to implement a new feature or fix a bug, please open an issue that explains the change and the motivation for it.
 
-<br/>
-<br/>
-
 # Pull request and git commit guidance
 
 ## Opening PRs and organizing commits
