@@ -7,13 +7,6 @@ Contributing is not limited to writing code and submitting a PR. Feel free to su
 
 Of course, contributing code is more than welcome! If you're planning to submit a PR to implement a new feature or fix a bug, please open an issue that explains the change and the motivation for it.
 
-If you are interested in contributing documentation, please note the following:
-
-- Doc issues are labeled with the `doc` label.
-- The thin-edge.io docs content is in the `docs/src/` directory.
-
-[How to build from source.](./BUILDING.md)
-
 <br/>
 <br/>
 
