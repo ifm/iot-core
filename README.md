@@ -1,1 +1,1 @@
-.NET IoTCore implementation
+.NET ifm IoTCore implementation
