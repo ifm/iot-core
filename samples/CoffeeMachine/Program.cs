@@ -26,11 +26,11 @@ namespace CoffeeMachine
             Parser.Default.ParseArguments<CommandLineParameters>(args)
                 .WithParsed(o =>
                 {
-                    Run(o.Id, o.HttpUri, o.OpcUri, o.LogConfigFile);
+                    Run(o.Id, o.HttpUri, o.LogConfigFile);
                 });
         }
 
-        private static void Run(string id, string httpUri, string opcUri, string logConfigFile)
+        private static void Run(string id, string httpUri, string logConfigFile)
         {
             var logLevel = GetLogLevel();
             _logger = logConfigFile == null ? new Logger(logLevel) : new Logger(logConfigFile, nameof(Program));
@@ -171,10 +171,7 @@ namespace CoffeeMachine
 
         [Option('u', "http-uri", Required = true, HelpText = "Uri to start the http server", Default = "http://127.0.0.1:8001")]
         public string HttpUri { get; set; }
-
-        [Option('o', "opc-uri", Required = false, HelpText = "Uri to start the opc server", Default = "opc.tcp://127.0.0.1:62546")]
-        public string OpcUri { get; set; }
-
+        
         [Option('l', "log-config", Required = false, HelpText = "Optional logger configuration file")]
         public string LogConfigFile { get; set; }
     }
