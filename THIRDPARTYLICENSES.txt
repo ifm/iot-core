@@ -1,12 +1,13 @@
 Nuget Package Name                                Version               License Url
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
-AutoMapper                                        {10.1.1}              https://licenses.nuget.org/MIT                                                        
-CommandLineParser                                 {2.8.0}               https://www.nuget.org/packages/CommandLineParser/2.8.0/License
-log4net                                           {2.0.13}              https://licenses.nuget.org/Apache-2.0                                                 
-MQTTnet                                           {3.1.0}               https://www.nuget.org/packages/MQTTnet/3.1.0/License
-MSBuildTasks                                      {1.5.0.235}           http://opensource.org/licenses/bsd-license.php                                        
-NETStandard.Library                               {2.0.3}               https://github.com/dotnet/standard/blob/master/LICENSE.TXT                            
-Newtonsoft.Json                                   {13.0.1}              https://licenses.nuget.org/MIT                                                        
-RestSharp                                         {106.11.7}            https://licenses.nuget.org/Apache-2.0                                                 
-TextCopy                                          {4.3.0}               https://licenses.nuget.org/MIT                                                        
-Tmds.DBus                                         {0.9.1}               https://licenses.nuget.org/MIT                                                        
+CommandLineParser                          {2.8.0}               https://www.nuget.org/packages/CommandLineParser/2.8.0/License
+coverlet.collector                         {3.0.2}               https://licenses.nuget.org/MIT                                        
+JetBrains.DotMemoryUnit                    {3.1.20200127.214830} https://www.jetbrains.com/dotmemory/docs/dotMemoryUnit_generalEULA.pdf
+log4net                                    {2.0.12}              https://licenses.nuget.org/Apache-2.0                                 
+Microsoft.NET.Test.Sdk                     {16.11.0}             https://www.nuget.org/packages/Microsoft.NET.Test.Sdk/16.11.0/License
+Microsoft.NETFramework.ReferenceAssemblies {1.0.0}               https://github.com/Microsoft/dotnet/blob/master/LICENSE               
+MQTTnet                                    {3.1.0}               https://www.nuget.org/packages/MQTTnet/3.1.0/License
+NETStandard.Library                        {2.0.3}               https://github.com/dotnet/standard/blob/master/LICENSE.TXT            
+Newtonsoft.Json                            {13.0.1}              https://licenses.nuget.org/MIT                                        
+nunit                                      {3.13.2}              https://www.nuget.org/packages/NUnit/3.13.2/License
+NUnit3TestAdapter                          {3.17.0}              https://www.nuget.org/packages/NUnit3TestAdapter/3.17.0/License
