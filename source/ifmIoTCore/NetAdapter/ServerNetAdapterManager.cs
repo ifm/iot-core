@@ -1,62 +1,65 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using ifmIoTCore.Exceptions;
-using ifmIoTCore.Messages;
-using ifmIoTCore.Resources;
-
-namespace ifmIoTCore.NetAdapter
+﻿namespace ifmIoTCore.NetAdapter
 {
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
+
     internal class ServerNetAdapterManager : IServerNetAdapterManager
     {
-        private readonly IClientNetAdapterManager _clientNetAdapterManager;
-
-        public ServerNetAdapterManager(IClientNetAdapterManager clientNetAdapterManager)
-        {
-            _clientNetAdapterManager = clientNetAdapterManager;
-        }
-
         private readonly List<IServerNetAdapter> _serverNetAdapters = new List<IServerNetAdapter>();
-        public IEnumerable<IServerNetAdapter> ServerNetAdapters => _serverNetAdapters;
 
-        public void RegisterServerNetAdapter(IServerNetAdapter netAdapterServer)
+        public IEnumerable<IServerNetAdapter> ServerNetAdapters
         {
-            if (netAdapterServer == null)
+            get
             {
-                throw new IoTCoreException(ResponseCodes.DataInvalid, string.Format(Resource1.ArgumentNullOrEmpty, nameof(netAdapterServer)));
+                lock (_serverNetAdapters)
+                {
+                    return new List<IServerNetAdapter>(_serverNetAdapters);
+                }
             }
-
-            _serverNetAdapters.Add(netAdapterServer);
         }
 
-        public void RemoveServerNetAdapter(IServerNetAdapter netAdapterServer)
+        public void RegisterServerNetAdapter(IServerNetAdapter serverNetAdapter)
         {
-            _serverNetAdapters.Remove(netAdapterServer);
+            if (serverNetAdapter == null) throw new ArgumentNullException(nameof(serverNetAdapter));
+
+            lock (_serverNetAdapters)
+            {
+                _serverNetAdapters.Add(serverNetAdapter);
+            }
+        }
+
+        public void RemoveServerNetAdapter(IServerNetAdapter serverNetAdapter)
+        {
+            if (serverNetAdapter == null) throw new ArgumentNullException(nameof(serverNetAdapter));
+
+            lock (_serverNetAdapters)
+            {
+                _serverNetAdapters.Remove(serverNetAdapter);
+                serverNetAdapter.Stop();
+                serverNetAdapter.Dispose();
+            }
         }
 
         public IServerNetAdapter FindServerNetAdapter(Uri uri)
         {
-            return _serverNetAdapters.FirstOrDefault(x => x.Uri == uri);
+            lock (_serverNetAdapters)
+            {
+                return _serverNetAdapters.FirstOrDefault(x => x.Uri == uri);
+            }
         }
 
-        public IServerNetAdapter FindReverseServerNetAdapter(Uri remoteUri)
+        public IEnumerable<IServerNetAdapter> FindServerNetAdapters(string scheme)
         {
-            Uri localUri;
-            var client = _clientNetAdapterManager.CreateClientNetAdapter(remoteUri);
-            try
+            lock (_serverNetAdapters)
             {
-                localUri = client.GetLocalUri();
+                return _serverNetAdapters.Where(x => x.Scheme == scheme);
             }
-            finally
-            {
-                client.Disconnect();
-            }
-            return _serverNetAdapters.FirstOrDefault(x => x.Uri.Scheme == localUri.Scheme && x.Uri.Host == localUri.Host);
         }
 
         public void Dispose()
         {
-            if (_serverNetAdapters != null)
+            lock (_serverNetAdapters)
             {
                 foreach (var item in _serverNetAdapters)
                 {

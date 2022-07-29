@@ -2,35 +2,31 @@
 {
     using System;
     using System.Collections.Generic;
+    using Common;
     using Elements;
     using Elements.Formats;
     using Elements.Valuations;
-    using Utilities;
 
     internal sealed class MqttCommIfSetupProfileBuilder : NotifyPropertyChangedBase
     {
         private readonly IBaseElement _targetElement;
-        private IDataElement<int> _qosElement;
-        private IDataElement<string> _versionElement;
+        private IDataElement _qosElement;
+        private IDataElement _versionElement;
         private int _qos;
-        private readonly IElementManager _elementManager;
-
 
         /// <summary>
         /// Initializes a new instance of <see cref="MqttCommIfSetupProfileBuilder"/>.
         /// </summary>
-        /// <param name="elementManager">The element manager</param>
         /// <param name="targetElement">The targetelement which contains the mqtt specific commifsetup profile.</param>
-        public MqttCommIfSetupProfileBuilder(IElementManager elementManager, IBaseElement targetElement)
+        public MqttCommIfSetupProfileBuilder(IBaseElement targetElement)
         {
-            this._elementManager = elementManager;
             this._targetElement = targetElement ?? throw new ArgumentNullException(nameof(targetElement));
         }
 
         /// <summary>
         /// Gets the name of the profile.
         /// </summary>
-        public string Name { get; } = "mqttsetup";
+        public string Name = "mqttsetup";
 
         /// <summary>
         /// Gets or sets the quality of service property.
@@ -52,34 +48,33 @@
         /// </summary>
         public void Build()
         {
-            this._qosElement = _elementManager.CreateDataElement<int>(_targetElement,
-                "QoS",
+            this._qosElement = new DataElement<int>("QoS",
                 element => this.Qos,
                 (element, i) =>
                 {
-                    if (this.Qos == i)
+                    if (this.Qos == (int)i)
                     {
                         return;
                     }
 
-                    this.Qos = i;
+                    this.Qos = (int)i;
                 }, 
-                true, true,
                 profiles: new List<string>{ "parameter" });
             // ToDo: Add a datachanged event?
 
-            this._versionElement = _elementManager.CreateDataElement<string>(_targetElement,
-                "version",
-                element => "3.1.1", 
-                null, 
-                true, false, 
+            _targetElement.AddChild(_qosElement);
+
+            this._versionElement = new ReadOnlyDataElement<string>("version",
+                element => "3.1.1",
                 format: new StringFormat(new StringValuation(0, 100), ns: "JSON"));
+
+            _targetElement.AddChild(_versionElement);
         }
 
         public void Dispose()
         {
-            _elementManager.RemoveElement(this._targetElement, this._qosElement);
-            _elementManager.RemoveElement(this._targetElement, this._versionElement);
+            if (_qosElement != null) _targetElement.RemoveChild(_qosElement);
+            if (_versionElement != null) _targetElement.RemoveChild(_versionElement);
         }
     }
 }

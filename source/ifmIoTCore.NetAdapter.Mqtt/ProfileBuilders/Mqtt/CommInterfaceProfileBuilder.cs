@@ -12,7 +12,7 @@
         private readonly Func<string> _typeFunc;
         private readonly IBaseElement _commIfSetupElement;
         private readonly IBaseElement _commChannelBaseElement;
-        private IDataElement<string> _typeElement;
+        private IDataElement _typeElement;
         private readonly IElementManager _elementManager;
 
         /// <summary>
@@ -37,12 +37,14 @@
         public void Dispose()
         {
             this._targetElement.RemoveProfile("commInterface");
-            _elementManager.RemoveElement(this._targetElement, this._runControlBaseElement);
-            _elementManager.RemoveElement(this._targetElement, this._typeElement);
-            _elementManager.RemoveElement(this._targetElement, this._commIfSetupElement);
+
+            _targetElement.RemoveChild(this._runControlBaseElement);
+            _targetElement.RemoveChild(this._typeElement);
+            _targetElement.RemoveChild(this._commIfSetupElement);
+            
             if (this._commChannelBaseElement != null)
             {
-                _elementManager.RemoveElement(this._targetElement, this._commChannelBaseElement);
+                _targetElement.RemoveChild(_commChannelBaseElement);
             }
         }
 
@@ -51,12 +53,11 @@
         public void Build()
         {
             this._targetElement.AddProfile(this.Name);
-            this._typeElement = _elementManager.CreateDataElement<string>(_targetElement,
-                "type",
+            this._typeElement = new ReadOnlyDataElement<string>("type",
                 element => this._typeFunc(),
-                null,
-                true, false,
                 format: new StringFormat(new StringValuation(0, 100)));
+
+            _targetElement.AddChild(_typeElement);
         }
     }
 }

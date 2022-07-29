@@ -9,11 +9,9 @@
     {
         private IBaseElement _connectionsElement;
         private readonly IDeviceElement _root;
-        private readonly IElementManager _elementManager;
 
-        public ConnectionsProfileBuilder(IElementManager elementManager, IDeviceElement root)
+        public ConnectionsProfileBuilder(IDeviceElement root)
         {
-            this._elementManager = elementManager;
             this._root = root ?? throw new ArgumentNullException(nameof(root));
         }
 
@@ -29,7 +27,7 @@
                 return;
             }
 
-            this._connectionsElement = _elementManager.CreateStructureElement(_root, this.Name, profiles: new List<string> {this.Name});
+            this._connectionsElement = _root.AddChild(new StructureElement(this.Name, profiles: new List<string> {this.Name}), true);
         }
 
         public void Dispose()
@@ -37,7 +35,7 @@
             var connectionsElement = this._root.GetElementByProfile(this.Name);
             if (connectionsElement != null && connectionsElement.Subs?.Any() == false)
             {
-                this._elementManager.RemoveElement(_root, connectionsElement);
+                _root.RemoveChild(connectionsElement);
             }
         }
     }

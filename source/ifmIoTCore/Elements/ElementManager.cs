@@ -1,629 +1,77 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using ifmIoTCore.Elements.EventArguments;
-using ifmIoTCore.Elements.Formats;
-using ifmIoTCore.Elements.ServiceData.Requests;
-using ifmIoTCore.Elements.ServiceData.Responses;
-using ifmIoTCore.Exceptions;
-using ifmIoTCore.Messages;
-using ifmIoTCore.Resources;
-using ifmIoTCore.Utilities;
-
-namespace ifmIoTCore.Elements
+﻿namespace ifmIoTCore.Elements
 {
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
+    using System.Threading;
+    using System.Web;
+    using Common;
+    using EventArguments;
+    using Exceptions;
+    using Logger;
+    using Messages;
+    using NetAdapter;
+    using Resources;
+    using ServiceData;
+    using ServiceData.Events;
+    using Utilities;
+
     internal class ElementManager : IElementManager
     {
-        private readonly IMessageSender _messageSender;
-        private ILogger _logger;
+        private readonly IClientNetAdapterManager _clientNetAdapterManager;
+        private readonly IServerNetAdapterManager _serverNetAdapterManager;
+        private readonly ILogger _logger;
+
         private readonly Dictionary<string, IBaseElement> _elements = new Dictionary<string, IBaseElement>(StringComparer.OrdinalIgnoreCase);
+        private IDeviceElement _rootElement;
 
-        public ReaderWriterLockSlim Lock { get; } = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
-
-        public event EventHandler<TreeChangedEventArgs> TreeChanged;
-
-        public ElementManager(IMessageSender messageSender, ILogger logger)
+        public ElementManager(IClientNetAdapterManager clientNetAdapterManager,
+            IServerNetAdapterManager serverNetAdapterManager,
+            ILogger logger)
         {
-            _messageSender = messageSender;
+            _clientNetAdapterManager = clientNetAdapterManager;
+            _serverNetAdapterManager = serverNetAdapterManager;
             _logger = logger;
         }
 
-        public IDeviceElement CreateRootDeviceElement(string identifier,
-            Func<IEnumerable<GetIdentityResponseServiceData.ServerInfo>> serverInfoProvider,
-            Func<string> versionProvider)
+        public ReaderWriterLockSlim Lock { get; } = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
+
+        public IDeviceElement Root
         {
-            var element = new RootElement(identifier,
-                this,
-                this._messageSender,
-                serverInfoProvider,
-                versionProvider,
-                this._logger);
-
-
-            AddElementToCache(element);
-
-            TreeChanged += (sender, args) =>
+            get => _rootElement;
+            set
             {
-                element.TreeChangedEventElement.RaiseEvent();
-            };
+                if (_rootElement == value) return;
 
-            return element;
-        }
-        
-        public IBaseElement GetRootElement()
-        {
-            var root = (from element in _elements
-                where element.Value.Parent == null
-                select element.Value).FirstOrDefault();
-
-            return root;
-        }
-
-        public IDeviceElement CreateDeviceElement(IBaseElement parentElement,
-            string identifier,
-            Func<IDeviceElement, GetIdentityResponseServiceData> getIdentityFunc,
-            Func<IDeviceElement, GetTreeRequestServiceData, GetTreeResponseServiceData> getTreeFunc,
-            Func<IDeviceElement, QueryTreeRequestServiceData, QueryTreeResponseServiceData> queryTreeFunc,
-            Func<IDeviceElement, GetDataMultiRequestServiceData, GetDataMultiResponseServiceData> getDataMultiFunc,
-            Action<IDeviceElement, SetDataMultiRequestServiceData> setDataMultiFunc,
-            Func<IDeviceElement, GetSubscriberListRequestServiceData, GetSubscriberListResponseServiceData> getSubscriberListFunc,
-            Format format = null,
-            List<string> profiles = null,
-            string uid = null,
-            bool isHidden = false,
-            object context = null,
-            bool raiseTreeChanged = false)
-        {
-            if (!Lock.TryEnterWriteLock(Configuration.Settings.Timeout))
-            {
-                throw new IoTCoreException(ResponseCodes.Locked, Resource1.ElementManagerLocked);
-            }
-
-            try
-            {
-                var element = new DeviceElement(parentElement,
-                    identifier,
-                    getIdentityFunc,
-                    getTreeFunc,
-                    queryTreeFunc,
-                    getDataMultiFunc,
-                    setDataMultiFunc,
-                    getSubscriberListFunc,
-                    format, profiles, uid, isHidden, context);
-
-                try
+                if (!Lock.TryEnterWriteLock(Configuration.Settings.Timeout))
                 {
-                    AddElement(parentElement, element);
-                }
-                catch (Exception)
-                {
-                    element.Dispose();
-                    throw;
-                }
-
-                if (raiseTreeChanged)
-                {
-                    RaiseTreeChanged(parentElement, element, TreeChangedAction.ElementAdded);
-                }
-
-                return element;
-            }
-            finally
-            {
-                Lock.ExitWriteLock();
-            }
-        }
-
-        public IStructureElement CreateStructureElement(IBaseElement parentElement,
-            string identifier,
-            Format format = null,
-            List<string> profiles = null,
-            string uid = null,
-            bool isHidden = false,
-            object context = null,
-            bool raiseTreeChanged = false)
-        {
-            if (!Lock.TryEnterWriteLock(Configuration.Settings.Timeout))
-            {
-                throw new IoTCoreException(ResponseCodes.Locked, Resource1.ElementManagerLocked);
-            }
-
-            try
-            {
-                var element = new StructureElement(parentElement,
-                    identifier,
-                    format, profiles, uid, isHidden, context);
-
-                try
-                {
-                    AddElement(parentElement, element);
-                }
-                catch (Exception)
-                {
-                    element.Dispose();
-                    throw;
-                }
-
-                if (raiseTreeChanged)
-                {
-                    RaiseTreeChanged(parentElement, element, TreeChangedAction.ElementAdded);
-                }
-
-                return element;
-            }
-            finally
-            {
-                Lock.ExitWriteLock();
-            }
-        }
-
-        public IActionServiceElement CreateActionServiceElement(IBaseElement parentElement,
-            string identifier,
-            Action<IActionServiceElement, int?> func,
-            Format format = null,
-            List<string> profiles = null,
-            string uid = null,
-            bool isHidden = false,
-            object context = null,
-            bool raiseTreeChanged = false)
-        {
-            if (!Lock.TryEnterWriteLock(Configuration.Settings.Timeout))
-            {
-                throw new IoTCoreException(ResponseCodes.Locked, Resource1.ElementManagerLocked);
-            }
-
-            try
-            {
-                var element = new ActionServiceElement(parentElement,
-                    identifier,
-                    func,
-                    format, profiles, uid, isHidden, context);
-
-                try
-                {
-                    AddElement(parentElement, element);
-                }
-                catch (Exception)
-                {
-                    element.Dispose();
-                    throw;
-                }
-
-                if (raiseTreeChanged)
-                {
-                    RaiseTreeChanged(parentElement, element, TreeChangedAction.ElementAdded);
-                }
-
-                return element;
-            }
-            finally
-            {
-                Lock.ExitWriteLock();
-            }
-        }
-
-        public IGetterServiceElement<TOut> CreateGetterServiceElement<TOut>(IBaseElement parentElement,
-            string identifier,
-            Func<IGetterServiceElement<TOut>, int?, TOut> func,
-            Format format = null,
-            List<string> profiles = null,
-            string uid = null,
-            bool isHidden = false,
-            object context = null,
-            bool raiseTreeChanged = false)
-        {
-            if (!Lock.TryEnterWriteLock(Configuration.Settings.Timeout))
-            {
-                throw new IoTCoreException(ResponseCodes.Locked, Resource1.ElementManagerLocked);
-            }
-
-            try
-            {
-                var element = new GetterServiceElement<TOut>(parentElement,
-                    identifier,
-                    func,
-                    format, profiles, uid, isHidden, context);
-
-                try
-                {
-                    AddElement(parentElement, element);
-                }
-                catch (Exception)
-                {
-                    element.Dispose();
-                    throw;
-                }
-
-                if (raiseTreeChanged)
-                {
-                    RaiseTreeChanged(parentElement, element, TreeChangedAction.ElementAdded);
-                }
-
-                return element;
-            }
-            finally
-            {
-                Lock.ExitWriteLock();
-            }
-        }
-
-        public ISetterServiceElement<TIn> CreateSetterServiceElement<TIn>(IBaseElement parentElement,
-            string identifier,
-            Action<ISetterServiceElement<TIn>, TIn, int?> func,
-            Format format = null,
-            List<string> profiles = null,
-            string uid = null,
-            bool isHidden = false,
-            object context = null,
-            bool raiseTreeChanged = false)
-        {
-            if (!Lock.TryEnterWriteLock(Configuration.Settings.Timeout))
-            {
-                throw new IoTCoreException(ResponseCodes.Locked, Resource1.ElementManagerLocked);
-            }
-
-            try
-            {
-                var element = new SetterServiceElement<TIn>(parentElement,
-                    identifier,
-                    func,
-                    format, profiles, uid, isHidden, context);
-
-                try
-                {
-                    AddElement(parentElement, element);
-                }
-                catch (Exception)
-                {
-                    element.Dispose();
-                    throw;
-                }
-
-                if (raiseTreeChanged)
-                {
-                    RaiseTreeChanged(parentElement, element, TreeChangedAction.ElementAdded);
-                }
-
-                return element;
-            }
-            finally
-            {
-                Lock.ExitWriteLock();
-            }
-        }
-
-        public IServiceElement<TIn, TOut> CreateServiceElement<TIn, TOut>(IBaseElement parentElement,
-            string identifier,
-            Func<IServiceElement<TIn, TOut>, TIn, int?, TOut> func,
-            Format format = null,
-            List<string> profiles = null,
-            string uid = null,
-            bool isHidden = false,
-            object context = null,
-            bool raiseTreeChanged = false)
-        {
-            if (!Lock.TryEnterWriteLock(Configuration.Settings.Timeout))
-            {
-                throw new IoTCoreException(ResponseCodes.Locked, Resource1.ElementManagerLocked);
-            }
-
-            try
-            {
-                var element = new ServiceElement<TIn, TOut>(parentElement,
-                    identifier,
-                    func,
-                    format, profiles, uid, isHidden, context);
-
-                try
-                {
-                    AddElement(parentElement, element);
-                }
-                catch (Exception)
-                {
-                    element.Dispose();
-                    throw;
-                }
-
-                if (raiseTreeChanged)
-                {
-                    RaiseTreeChanged(parentElement, element, TreeChangedAction.ElementAdded);
-                }
-
-                return element;
-            }
-            finally
-            {
-                Lock.ExitWriteLock();
-            }
-        }
-
-        public IEventElement CreateEventElement(IBaseElement parentElement,
-            string identifier,
-            Action<IEventElement, SubscribeRequestServiceData, int?> preSubscribeFunc = null,
-            Action<IEventElement, UnsubscribeRequestServiceData, int?> postUnsubscribeFunc = null,
-            Format format = null,
-            List<string> profiles = null,
-            string uid = null,
-            bool isHidden = false,
-            object context = null,
-            bool raiseTreeChanged = false)
-        {
-            if (!Lock.TryEnterWriteLock(Configuration.Settings.Timeout))
-            {
-                throw new IoTCoreException(ResponseCodes.Locked, Resource1.ElementManagerLocked);
-            }
-
-            try
-            {
-                var element = new EventElement(this,
-                    this._messageSender,
-                    this._logger,
-                    parentElement,
-                    identifier,
-                    preSubscribeFunc,
-                    postUnsubscribeFunc,
-                    format, profiles, uid, isHidden, context);
-
-                try
-                {
-                    AddElement(parentElement, element);
-                }
-                catch (Exception)
-                {
-                    element.Dispose();
-                    throw;
-                }
-
-                if (raiseTreeChanged)
-                {
-                    RaiseTreeChanged(parentElement, element, TreeChangedAction.ElementAdded);
-                }
-
-                return element;
-            }
-            finally
-            {
-                Lock.ExitWriteLock();
-            }
-        }
-
-        public IDataElement<T> CreateDataElement<T>(IBaseElement parentElement,
-            string identifier,
-            Func<IDataElement<T>, T> getDataFunc,
-            Action<IDataElement<T>, T> setDataFunc,
-            bool createGetDataServiceElement = true,
-            bool createSetDataServiceElement = true,
-            T value = default,
-            TimeSpan? cacheTimeout = null,
-            Format format = null,
-            List<string> profiles = null,
-            string uid = null,
-            bool isHidden = false,
-            object context = null,
-            bool raiseTreeChanged = false)
-        {
-            if (!Lock.TryEnterWriteLock(Configuration.Settings.Timeout))
-            {
-                throw new IoTCoreException(ResponseCodes.Locked, Resource1.ElementManagerLocked);
-            }
-
-            try
-            {
-                var element = new DataElement<T>(parentElement,
-                    identifier,
-                    getDataFunc,
-                    setDataFunc,
-                    createGetDataServiceElement,
-                    createSetDataServiceElement,
-                    value,
-                    cacheTimeout,
-                    format, profiles, uid, isHidden, context);
-
-                try
-                {
-                    AddElement(parentElement, element);
-                }
-                catch (Exception)
-                {
-                    element.Dispose();
-                    throw;
-                }
-
-                if (raiseTreeChanged)
-                {
-                    RaiseTreeChanged(parentElement, element);
-                }
-
-                return element;
-            }
-            finally
-            {
-                Lock.ExitWriteLock();
-            }
-        }
-
-        private void AddElement(IBaseElement parentElement, IBaseElement element)
-        {
-            if (!parentElement.Lock.TryEnterWriteLock(Configuration.Settings.Timeout))
-            {
-                throw new IoTCoreException(ResponseCodes.Locked, string.Format(Resource1.ElementLocked, parentElement.Identifier));
-            }
-
-            try
-            {
-                if (parentElement.References.ForwardReferences?.FirstOrDefault(x => string.Equals(x.Identifier, element.Identifier, StringComparison.OrdinalIgnoreCase)) != null)
-                {
-                    throw new IoTCoreException(ResponseCodes.AlreadyExists, string.Format(Resource1.ElementAlreadyExists, element.Identifier, parentElement.Identifier));
-                }
-
-                parentElement.References.AddForwardReference(parentElement, element, element.Identifier, ReferenceType.Child);
-
-                AddElementToCache(element);
-            }
-            finally
-            {
-                parentElement.Lock.ExitWriteLock();
-            }
-        }
-
-        public void RemoveElement(IBaseElement parentElement, IBaseElement element, bool raiseTreeChanged = false)
-        {
-            if (parentElement == null) throw new ArgumentNullException(nameof(parentElement));
-            if (element == null) throw new ArgumentNullException(nameof(element));
-
-            if (!Lock.TryEnterWriteLock(Configuration.Settings.Timeout))
-            {
-                throw new IoTCoreException(ResponseCodes.Locked, Resource1.ElementManagerLocked);
-            }
-
-            try
-            {
-                if (!parentElement.Lock.TryEnterWriteLock(Configuration.Settings.Timeout))
-                {
-                    throw new IoTCoreException(ResponseCodes.Locked, string.Format(Resource1.ElementLocked, parentElement.Identifier));
+                    throw new IoTCoreException(ResponseCodes.Locked, Resource1.ElementManagerLocked);
                 }
 
                 try
                 {
-                    if (parentElement.References.ForwardReferences?.FirstOrDefault(x => x.TargetElement == element && x.IsChild) == null)
+                    if (_rootElement != null)
                     {
-                        throw new IoTCoreException(ResponseCodes.NotFound, string.Format(Resource1.ElementNotChild, element.Identifier, parentElement.Identifier));
+                        _rootElement.ElementAdded -= OnElementAdded;
+                        _rootElement.ElementRemoved -= OnElementRemoved;
+                        _rootElement.LinkAdded -= OnLinkAdded;
+                        _rootElement.LinkRemoved -= OnLinkRemoved;
                     }
 
-                    // First remove the element from the cache
-                    RemoveElementFromCache(element);
+                    _elements.Clear();
 
-                    // Then remove the reference to the element from the parent
-                    parentElement.References.RemoveForwardReference(parentElement, element);
+                    _rootElement = value;
+                    _rootElement.ElementAdded += OnElementAdded;
+                    _rootElement.ElementRemoved += OnElementRemoved;
+                    _rootElement.LinkAdded += OnLinkAdded;
+                    _rootElement.LinkRemoved += OnLinkRemoved;
 
-                    // Then dispose the element
-                    // Dispose element removes all event handlers and references from the element and disposes all child elements
-                    element.Dispose();
+                    AddElement(null, _rootElement);
                 }
-
                 finally
                 {
-                    parentElement.Lock.ExitWriteLock();
+                    Lock.ExitWriteLock();
                 }
-
-                if (raiseTreeChanged)
-                {
-                    RaiseTreeChanged(parentElement, element, TreeChangedAction.ElementRemoved);
-                }
-            }
-
-            finally
-            {
-                Lock.ExitWriteLock();
-            }
-        }
-
-        public void AddLink(IBaseElement sourceElement, IBaseElement targetElement, string identifier = null, bool raiseTreeChanged = true)
-        {
-            if (sourceElement == null) throw new ArgumentNullException(nameof(sourceElement));
-            if (targetElement == null) throw new ArgumentNullException(nameof(targetElement));
-
-            if (!Lock.TryEnterWriteLock(Configuration.Settings.Timeout))
-            {
-                throw new IoTCoreException(ResponseCodes.Locked, Resource1.ElementManagerLocked);
-            }
-
-            try
-            {
-                if (!sourceElement.Lock.TryEnterWriteLock(Configuration.Settings.Timeout))
-                {
-                    throw new IoTCoreException(ResponseCodes.Locked, string.Format(Resource1.ElementLocked, sourceElement.Identifier));
-                }
-
-                try
-                {
-                    if (!targetElement.Lock.TryEnterWriteLock(Configuration.Settings.Timeout))
-                    {
-                        throw new IoTCoreException(ResponseCodes.Locked, string.Format(Resource1.ElementLocked, targetElement.Identifier));
-                    }
-
-                    //    try
-                    //    {
-                    //        identifier ??= element.Identifier;
-
-                    //        // Check if reference to element already exists
-                    //        if (parentElement.References.ForwardReferences?.FirstOrDefault(x => x.TargetElement == element) != null ||
-                    //            parentElement.References.ForwardReferences?.FirstOrDefault(x => string.Equals(x.Identifier, identifier, StringComparison.OrdinalIgnoreCase)) != null)
-                    //        {
-                    //            throw new IoTCoreException(ResponseCodes.AlreadyExists, string.Format(Resource1.ElementAlreadyExists, parentElement.Identifier, identifier));
-                    //        }
-
-                    //        //// Check for circular dependency
-                    //        //if (IsCircularDependency(this, element))
-                    //        //{
-                    //        //    throw new IoTCoreException(ResponseCodes.NotAllowed, string.Format(Resource1.AddAncestorElementNotAllowed, identifier, Identifier));
-                    //        //}
-
-                    //        // Then set child context
-                    //        element.References.AddInverseReference(element, parentElement, identifier, ReferenceType.Link);
-
-                    //        // Then add a reference to the element 
-                    //        parentElement.References.AddForwardReference(parentElement, element, identifier, ReferenceType.Link);
-                    //    }
-                    //    finally
-                    //    {
-                    //        element.Lock.ExitWriteLock();
-                    //    }
-                }
-
-                finally
-                {
-                    sourceElement.Lock.ExitWriteLock();
-                }
-
-                if (raiseTreeChanged)
-                {
-                    RaiseTreeChanged(sourceElement, targetElement, TreeChangedAction.ElementAdded);
-                }
-            }
-
-            finally
-            {
-                Lock.ExitWriteLock();
-            }
-        }
-
-        public void RemoveLink(IBaseElement sourceElement, IBaseElement targetElement, bool raiseTreeChanged = true)
-        {
-            if (sourceElement == null) throw new ArgumentNullException(nameof(sourceElement));
-            if (targetElement == null) throw new ArgumentNullException(nameof(targetElement));
-
-            if (!Lock.TryEnterWriteLock(Configuration.Settings.Timeout))
-            {
-                throw new IoTCoreException(ResponseCodes.Locked, Resource1.ElementManagerLocked);
-            }
-
-            try
-            {
-                //if (!parentElement.Lock.TryEnterWriteLock(Configuration.Settings.Timeout))
-                //{
-                //    throw new IoTCoreException(ResponseCodes.Locked, string.Format(Resource1.ElementLocked, parentElement.Identifier));
-                //}
-
-                //try
-                //{
-                //}
-
-                //finally
-                //{
-                //    parentElement.Lock.ExitWriteLock();
-                //}
-
-                //if (raiseTreeChanged)
-                //{
-                //    RaiseTreeChanged(parentElement, element, TreeChangedAction.ElementRemoved);
-                //}
-            }
-
-            finally
-            {
-                Lock.ExitWriteLock();
             }
         }
 
@@ -642,46 +90,411 @@ namespace ifmIoTCore.Elements
                 _elements.TryGetValue(address, out var element);
                 return element;
             }
-
             finally
             {
                 Lock.ExitReadLock();
             }
         }
 
-        private void AddElementToCache(IBaseElement element)
+        public IEnumerable<IBaseElement> GetElementsByProfile(string profile)
         {
-            _elements.Add(element.Address, element);
+            if (string.IsNullOrEmpty(profile)) return null;
 
-            // Add any referenced elements
-            if (element.ForwardReferences == null) return;
-            foreach (var item in element.ForwardReferences)
+            if (!Lock.TryEnterReadLock(Configuration.Settings.Timeout))
             {
-                AddElementToCache(item.TargetElement);
+                throw new IoTCoreException(ResponseCodes.Locked, Resource1.ElementManagerLocked);
+            }
+
+            try
+            {
+                return _elements.Values.Where(element => element.HasProfile(profile)).ToList();
+            }
+            finally
+            {
+                Lock.ExitReadLock();
             }
         }
 
-        private void RemoveElementFromCache(IBaseElement element)
+        private void OnElementAdded(object _, TreeChangedEventArgs e)
         {
-            _elements.Remove(element.Address);
+            AddElement(e.ParentElement, e.ChildElement);
+        }
 
-            // Remove any referenced elements
-            if (element.ForwardReferences == null) return;
-            foreach (var item in element.ForwardReferences)
+        private void OnElementRemoved(object _, TreeChangedEventArgs e)
+        {
+            RemoveElement(e.ParentElement, e.ChildElement);
+        }
+
+        private void OnLinkAdded(object _, TreeChangedEventArgs e)
+        {
+            AddLinkedElement(e.ParentElement, e.ChildElement, e.Identifier);
+        }
+
+        private void OnLinkRemoved(object _, TreeChangedEventArgs e)
+        {
+            RemoveLinkedElement(e.ParentElement, e.ChildElement, e.Identifier);
+        }
+
+        private void AddElement(IBaseElement parentElement, IBaseElement childElement)
+        {
+            if (childElement == null) throw new ArgumentNullException(nameof(childElement));
+
+            if (!Lock.TryEnterWriteLock(Configuration.Settings.Timeout))
             {
-                RemoveElementFromCache(item.TargetElement);
+                throw new IoTCoreException(ResponseCodes.Locked, Resource1.ElementManagerLocked);
+            }
+
+            try
+            {
+                SetRaiseEventFunc(childElement);
+
+                if (parentElement != null)
+                {
+                    var parentAddresses = GetAllAddressesFromCache(parentElement);
+                    foreach (var parentAddress in parentAddresses)
+                    {
+                        AddElementToCache(parentAddress, childElement);
+                    }
+                }
+                else
+                {
+                    AddElementToCache(null, childElement);
+                }
+            }
+            finally
+            {
+                Lock.ExitWriteLock();
             }
         }
 
-        public void RaiseTreeChanged(IBaseElement parentElement = null, IBaseElement childElement = null, TreeChangedAction action = TreeChangedAction.TreeChanged)
+        private void RemoveElement(IBaseElement parentElement, IBaseElement childElement)
         {
-            var treeChangedEventArgs = new TreeChangedEventArgs
+            if (parentElement == null) throw new ArgumentNullException(nameof(parentElement));
+            if (childElement == null) throw new ArgumentNullException(nameof(childElement));
+
+            if (!Lock.TryEnterWriteLock(Configuration.Settings.Timeout))
             {
-                Action = action,
-                ParentElement = parentElement,
-                ChildElement = childElement
-            };
-            TreeChanged.Raise(this, treeChangedEventArgs);
+                throw new IoTCoreException(ResponseCodes.Locked, Resource1.ElementManagerLocked);
+            }
+
+            try
+            {
+                var parentAddresses = GetAllAddressesFromCache(parentElement);
+                foreach (var parentAddress in parentAddresses)
+                {
+                    RemoveElementFromCache(parentAddress, childElement);
+                }
+            }
+            finally
+            {
+                Lock.ExitWriteLock();
+            }
+        }
+
+        private void AddLinkedElement(IBaseElement sourceElement, IBaseElement targetElement, string identifier)
+        {
+            if (sourceElement == null) throw new ArgumentNullException(nameof(sourceElement));
+            if (targetElement == null) throw new ArgumentNullException(nameof(targetElement));
+
+            if (!Lock.TryEnterWriteLock(Configuration.Settings.Timeout))
+            {
+                throw new IoTCoreException(ResponseCodes.Locked, Resource1.ElementManagerLocked);
+            }
+
+            try
+            {
+                var parentAddresses = GetAllAddressesFromCache(sourceElement);
+                foreach (var parentAddress in parentAddresses)
+                {
+                    AddLinkedElementToCache(parentAddress, targetElement, identifier);
+                }
+            }
+            finally
+            {
+                Lock.ExitWriteLock();
+            }
+        }
+
+        private void RemoveLinkedElement(IBaseElement sourceElement, IBaseElement targetElement, string identifier)
+        {
+            if (sourceElement == null) throw new ArgumentNullException(nameof(sourceElement));
+            if (targetElement == null) throw new ArgumentNullException(nameof(targetElement));
+
+            if (!Lock.TryEnterWriteLock(Configuration.Settings.Timeout))
+            {
+                throw new IoTCoreException(ResponseCodes.Locked, Resource1.ElementManagerLocked);
+            }
+
+            try
+            {
+                var parentAddresses = GetAllAddressesFromCache(sourceElement);
+                foreach (var parentAddress in parentAddresses)
+                {
+                    RemoveLinkedElementFromCache(parentAddress, targetElement, identifier);
+                }
+            }
+            finally
+            {
+                Lock.ExitWriteLock();
+            }
+        }
+
+        private IEnumerable<string> GetAllAddressesFromCache(IBaseElement element)
+        {
+            var addresses = new List<string>();
+            foreach (var item in _elements)
+            {
+                if (item.Value == element)
+                {
+                    addresses.Add(item.Key);
+                }
+            }
+            return addresses;
+            //return _elements.Where(x => x.Value == element).Select(x => x.Key);
+        }
+
+        private void AddElementToCache(string parentAddress, IBaseElement element)
+        {
+            var address = parentAddress != null ? Helpers.CreateAddress(parentAddress, element.Identifier) : element.Address;
+            _elements.Add(address, element);
+
+            if (element.ForwardReferences == null) return;
+            foreach (var item in element.ForwardReferences)
+            {
+                AddElementToCache(address, item.TargetElement);
+            }
+        }
+
+        private void AddLinkedElementToCache(string parentAddress, IBaseElement element, string identifier)
+        {
+            var address = Helpers.CreateAddress(parentAddress, identifier);
+            _elements.Add(address, element);
+
+            if (element.ForwardReferences == null) return;
+            foreach (var item in element.ForwardReferences)
+            {
+                AddLinkedElementToCache(address, item.TargetElement, item.TargetElement.Identifier);
+            }
+        }
+
+        private void RemoveElementFromCache(string parentAddress, IBaseElement element)
+        {
+            var address = Helpers.CreateAddress(parentAddress, element.Identifier);
+            _elements.Remove(address);
+
+            if (element.ForwardReferences == null) return;
+            foreach (var item in element.ForwardReferences)
+            {
+                RemoveElementFromCache(address, item.TargetElement);
+            }
+        }
+
+        private void RemoveLinkedElementFromCache(string parentAddress, IBaseElement element, string identifier)
+        {
+            var address = Helpers.CreateAddress(parentAddress, identifier);
+            if (address != element.Address)
+            {
+                _elements.Remove(address);
+            }
+
+            if (element.ForwardReferences == null) return;
+            foreach (var item in element.ForwardReferences)
+            {
+                RemoveLinkedElementFromCache(address, item.TargetElement, item.TargetElement.Identifier);
+            }
+        }
+
+        private void SetRaiseEventFunc(IBaseElement element)
+        {
+            if (element is IEventElement eventElement)
+            {
+                if (eventElement.RaiseEventFunc == null)
+                {
+                    eventElement.RaiseEventFunc = SendEvents;
+                }
+            }
+
+            if (element.ForwardReferences == null) return;
+            foreach (var item in element.ForwardReferences)
+            {
+                SetRaiseEventFunc(item.TargetElement);
+            }
+        }
+
+        private void SendEvents(IEventElement eventElement, SubscriptionEventArgs args)
+        {
+            if (!eventElement.SubscriptionsLock.TryEnterReadLock(Configuration.Settings.Timeout))
+            {
+                throw new IoTCoreException(ResponseCodes.Locked, Resource1.ElementManagerLocked);
+            }
+
+            try
+            {
+                foreach (var subscription in eventElement.Subscriptions)
+                {
+                    try
+                    {
+                        var eventServiceData = CreateEventServiceData(eventElement, subscription, args);
+
+                        if (!TryInvokeCallbackFunc(eventElement, subscription))
+                        {
+                            if (!TrySendFromServerToConnectedClient(subscription, eventServiceData))
+                            {
+                                if (!TrySendFromClientToServer(subscription, eventServiceData))
+                                {
+                                    if (!TryInvokeService(subscription, eventServiceData))
+                                    {
+                                        _logger?.Error(string.Format(Resource1.SendEventFailed, subscription.Callback, "No suitable method to dispatch event available"));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        _logger?.Error(string.Format(Resource1.SendEventFailed, subscription.Callback, e.Message));
+                    }
+                }
+            }
+            finally
+            {
+                eventElement.SubscriptionsLock.ExitReadLock();
+            }
+        }
+
+        private static bool TryInvokeCallbackFunc(IEventElement eventElement, Subscription subscription)
+        {
+            if (subscription.CallbackFunc != null)
+            {
+                subscription.CallbackFunc.Invoke(eventElement);
+
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool TrySendFromServerToConnectedClient(Subscription subscription, EventServiceData eventServiceData)
+        {
+            // If authority is provided event is not for a connected client
+            if (subscription.Callback.IndexOf("://", StringComparison.Ordinal) != -1)
+            {
+                return false;
+            }
+
+            var scheme = subscription.Callback.Left(":");
+            if (scheme == null)
+            {
+                return false;
+            }
+
+            var target = subscription.Callback.Right(":");
+            if (target == null)
+            {
+                return false;
+            }
+
+            var path = target.Left('?');
+
+            var query = target.Right('?');
+            if (query == null)
+            {
+                return false;
+            }
+
+            var clientId = HttpUtility.ParseQueryString(query).Get("clientid");
+            if (clientId == null)
+            {
+                return false;
+            }
+
+            var servers = _serverNetAdapterManager.FindServerNetAdapters(scheme);
+            foreach (var server in servers)
+            {
+                if (server is IConnectedServerNetAdapter connectedServer)
+                {
+                    if (connectedServer.IsClientConnected(clientId))
+                    {
+                        var eventMessage = new Message(RequestCodes.Event,
+                            subscription.Id,
+                            path,
+                            Helpers.VariantFromObject(eventServiceData));
+
+                        connectedServer.SendEvent(clientId, eventMessage);
+
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private bool TrySendFromClientToServer(Subscription subscription, EventServiceData eventServiceData)
+        {
+            if (Uri.TryCreate(subscription.Callback, UriKind.Absolute, out var uri))
+            {
+                var eventMessage = new Message(RequestCodes.Event,
+                    subscription.Id,
+                    uri.LocalPath,
+                    Helpers.VariantFromObject(eventServiceData));
+
+                var client = _clientNetAdapterManager.CreateClientNetAdapter(new Uri(subscription.Callback));
+                client.SendEvent(eventMessage);
+
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool TryInvokeService(Subscription subscription, EventServiceData eventServiceData)
+        {
+            var element = GetElementByAddress(Helpers.RemoveDeviceName(subscription.Callback));
+            if (element is IServiceElement serviceElement)
+            {
+                serviceElement.Invoke(Helpers.VariantFromObject(eventServiceData));
+
+                return true;
+            }
+
+            return false;
+        }
+
+        private EventServiceData CreateEventServiceData(IEventElement eventElement, Subscription subscription, SubscriptionEventArgs args)
+        {
+            var payload = new Dictionary<string, CodeDataPair>();
+            if (subscription.DataToSend != null && subscription.DataToSend.Count > 0)
+            {
+                foreach (var item in subscription.DataToSend)
+                {
+                    var element = GetElementByAddress(Helpers.RemoveDeviceName(item));
+                    if (element is IDataElement dataElement)
+                    {
+                        try
+                        {
+                            payload.Add(item, new CodeDataPair(ResponseCodes.Success, dataElement.Value));
+                        }
+                        catch (IoTCoreException iotCoreException)
+                        {
+                            payload.Add(item, new CodeDataPair(iotCoreException.ResponseCode, null));
+                        }
+                        catch
+                        {
+                            payload.Add(item, new CodeDataPair(ResponseCodes.InternalError, null));
+                        }
+                    }
+                    else
+                    {
+                        payload.Add(item, new CodeDataPair(ResponseCodes.NotFound, null));
+                    }
+                }
+            }
+
+            return new EventServiceData(args.EventNumber,
+                Helpers.AddDeviceName(eventElement.Address, this._rootElement.Identifier),
+                payload.Any() ? payload : null,
+                subscription.Id);
         }
     }
 }

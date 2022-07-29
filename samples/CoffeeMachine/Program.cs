@@ -1,22 +1,26 @@
-﻿using System;
-using System.Net;
-using CoffeeMachine.Model;
-using CommandLine;
-using ifmIoTCore;
-using ifmIoTCore.Converter.Json;
-using ifmIoTCore.Elements.EventArguments;
-using ifmIoTCore.Exceptions;
-using ifmIoTCore.Logging.Log4Net;
-using ifmIoTCore.Messages;
-using ifmIoTCore.NetAdapter.Http;
-using ifmIoTCore.NetAdapter.Mqtt;
-using ifmIoTCore.Profiles.DeviceManagement;
-using ifmIoTCore.Profiles.IoTCoreManagement;
-using ifmIoTCore.Resources;
-using ifmIoTCore.Utilities;
-
-namespace CoffeeMachine
+﻿namespace DemoApp1
 {
+    using System;
+    using System.IO;
+    using System.Net;
+    using CommandLine;
+    using CoffeeMachine.Model;
+    using ifmIoTCore;
+    using ifmIoTCore.Common.Variant;
+    using ifmIoTCore.Elements.EventArguments;
+    using ifmIoTCore.Exceptions;
+    using ifmIoTCore.Logger;
+    using ifmIoTCore.Logging.Log4Net;
+    using ifmIoTCore.Messages;
+    using ifmIoTCore.NetAdapter.Http;
+    using ifmIoTCore.NetAdapter.Mqtt;
+    using ifmIoTCore.Profiles.DeviceManagement;
+    using ifmIoTCore.Profiles.IoTCoreManagement;
+    using ifmIoTCore.Resources;
+    using ifmIoTCore.Elements;
+    using ifmIoTCore.Profiles.Base;
+    using ifmIoTCore.Utilities;
+
     internal class Program
     {
         private static ILogger _logger;
@@ -26,11 +30,11 @@ namespace CoffeeMachine
             Parser.Default.ParseArguments<CommandLineParameters>(args)
                 .WithParsed(o =>
                 {
-                    Run(o.Id, o.HttpUri, o.LogConfigFile);
+                    Run(o.Id, o.HttpUri, o.OpcUri, o.LogConfigFile);
                 });
         }
 
-        private static void Run(string id, string httpUri, string logConfigFile)
+        private static void Run(string id, string httpUri, string opcUri, string logConfigFile)
         {
             var logLevel = GetLogLevel();
             _logger = logConfigFile == null ? new Logger(logLevel) : new Logger(logConfigFile, nameof(Program));
@@ -40,36 +44,38 @@ namespace CoffeeMachine
                 _logger.Info("Application starting up");
 
                 _logger.Info($"Create IoTCore '{id}'");
-                var ioTCore = IoTCoreFactory.Create(id, _logger);
+                var ioTCore = IoTCoreFactory.Create(id, null, _logger);
 
                 _logger.Info("Register tree_changed event handler");
-                ioTCore.TreeChanged += IoTCore_TreeChangedEvent;
+                ioTCore.Root.TreeChanged += IoTCore_TreeChangedEvent;
 
                 _logger.Info("Create some elements");
                 CreateElements(ioTCore);
 
+                var messageConverter = new ifmIoTCore.MessageConverter.Json.Newtonsoft.MessageConverter();
+
                 _logger.Info("Register http client factory");
-                ioTCore.RegisterClientNetAdapterFactory(new HttpClientNetAdapterFactory(new ifmIoTCore.Converter.Json.JsonConverter()));
+                ioTCore.RegisterClientNetAdapterFactory(new HttpClientNetAdapterFactory(messageConverter));
 
                 _logger.Info("Register mqtt client factory");
-                ioTCore.RegisterClientNetAdapterFactory(new MqttNetAdapterClientFactory(new ifmIoTCore.Converter.Json.JsonConverter()));
+                ioTCore.RegisterClientNetAdapterFactory(new MqttNetAdapterClientFactory(messageConverter));
 
-                var mqttServer = new MqttServerNetAdapter(ioTCore, ioTCore.Root, new JsonConverter(),
+                var mqttServer = new MqttServerNetAdapter(ioTCore, ioTCore.Root, messageConverter,
                     IPEndPoint.Parse("127.0.0.1:1883"));
                 ioTCore.RegisterServerNetAdapter(mqttServer);
 
                 mqttServer.Start();
 
                 _logger.Info("Adding profile 'iotcore_management'");
-                var elementProfileBuilder = new IoTCoreManagementProfileBuilder(ioTCore);
+                var elementProfileBuilder = new IoTCoreManagementProfileBuilder(new ProfileBuilderConfiguration(ioTCore, ioTCore.Root.Address));
                 elementProfileBuilder.Build();
 
                 _logger.Info("Adding profile 'device_management'");
-                var deviceProfileBuilder = new DeviceManagementProfileBuilder(ioTCore);
+                var deviceProfileBuilder = new DeviceManagementProfileBuilder(new ProfileBuilderConfiguration(ioTCore, ioTCore.Root.Address));
                 deviceProfileBuilder.Build();
 
                 _logger.Info($"Starting http server on {httpUri}");
-                var httpServer = new HttpServerNetAdapter(ioTCore, new Uri(httpUri), new ifmIoTCore.Converter.Json.JsonConverter(), _logger);
+                var httpServer = new HttpServerNetAdapter(ioTCore, new Uri(httpUri), messageConverter, _logger);
                 ioTCore.RegisterServerNetAdapter(httpServer);
                 httpServer.Start();
                 
@@ -77,11 +83,14 @@ namespace CoffeeMachine
 
                 using (var manualResetEventSlim = new System.Threading.ManualResetEventSlim())
                 {
-                    ioTCore.CreateActionServiceElement(ioTCore.Root, "stop", (sender, cid) => 
-                    {
-                        // ReSharper disable once AccessToDisposedClosure
-                        manualResetEventSlim.Set();
-                    });
+                    var a = new ActionServiceElement("stop",
+                        (sender, cid) => 
+                        {
+                            // ReSharper disable once AccessToDisposedClosure
+                            // manualResetEventSlim.Set();
+                        });
+
+                    ioTCore.Root.AddChild(a);
 
                     manualResetEventSlim.Wait();
                 }
@@ -98,6 +107,25 @@ namespace CoffeeMachine
             }
         }
 
+        private static string GetOrCreateIoddDirectory()
+        {
+            var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "ifm", "iodds");
+            if (Directory.Exists(path))
+            {
+                var dirInfo = new DirectoryInfo(path);
+                if ((dirInfo.Attributes & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
+                {
+                    throw new Exception("IODD directory is readonly");
+                }
+            }
+            else
+            {
+                Directory.CreateDirectory(path);
+            }
+
+            return path;
+        }
+
         private static LogLevel GetLogLevel()
         {
             var logLevelSetting = System.Configuration.ConfigurationManager.AppSettings.Get("logLevel");
@@ -110,44 +138,62 @@ namespace CoffeeMachine
             ioTCore.Logger.Info($"Tree changed: Parent={e.ParentElement} Child={e.ChildElement} Action={e.Action}");
         }
 
-        private static readonly Model.CoffeeMachine _coffeMachine = new Model.CoffeeMachine();
+        private static readonly CoffeeMachine _coffeMachine = new CoffeeMachine();
 
         private static void CreateElements(IIoTCore ioTCore)
         {
-            var coffeeMachine = ioTCore.CreateStructureElement(ioTCore.Root, "coffemachine");
+            var coffeeMachine = new StructureElement("coffemachine");
+            ioTCore.Root.AddChild(coffeeMachine);
 
-            ioTCore.CreateServiceElement<bool, Capuccino>(coffeeMachine, "create_capuccino",
-                (element, addSugar, cid) =>
+            var createCappucinoService = new ServiceElement(
+                "create_capuccino",
+                (element, data, cid) =>
                 {
-                    return _coffeMachine.CreateCapuccino(addSugar);
+                    var addSugar = (bool)data.AsVariantValue();
+                    var response = _coffeMachine.CreateCapuccino(addSugar);
+                    return Helpers.VariantFromObject(response);
                 });
 
-            ioTCore.CreateGetterServiceElement<LatteMachiatto>(coffeeMachine, "create_latte_macchiato",
-                (element, cid) =>
-                {
-                    return _coffeMachine.CreateLatteMacchiato();
-                });
+            coffeeMachine.AddChild(createCappucinoService);
 
-            ioTCore.CreateServiceElement<SpecialLatteMacciatoParameters, LatteMachiatto>(coffeeMachine,
-                "create_special_latte_macchiato", (element, parameters, cid) =>
+            var createLatteService = new GetterServiceElement("create_latte_macchiato",
+                (element, cid) => 
+                    Helpers.VariantFromObject(_coffeMachine.CreateLatteMacchiato()));
+
+            coffeeMachine.AddChild(createLatteService);
+
+            var createSpecialLatteService = new ServiceElement(
+                "create_special_latte_macchiato", 
+                (element, data, cid) =>
                 {
-                    if (parameters == null)
+                    if (data == null)
                     {
-                        throw new ServiceException(ResponseCodes.BadRequest, string.Format(Resource1.ServiceDataEmpty, "create_special_latte_macchiato"));
+                        throw new IoTCoreException(ResponseCodes.BadRequest, string.Format(Resource1.ServiceDataEmpty, "create_special_latte_macchiato"));
                     }
 
-                    return _coffeMachine.CreateSpecialLatteMachiatto(parameters.AddSugar, parameters.Amount);
+                    var parameters = Helpers.VariantToObject<SpecialLatteMacciatoParameters>(data);
+                    var response = _coffeMachine.CreateSpecialLatteMachiatto(parameters.AddSugar, parameters.Amount);
+                    return Helpers.VariantFromObject(response);
                 });
 
-            ioTCore.CreateDataElement<uint>(coffeeMachine, "watertank_level",
+            coffeeMachine.AddChild(createSpecialLatteService);
+
+            var level = new ReadOnlyDataElement<uint>("watertank_level",
                 element =>
                 {
                     return _coffeMachine.WaterTank.Level;
-                }, createSetDataServiceElement: false);
-            
-            ioTCore.CreateActionServiceElement(coffeeMachine, "fill_watertank", (element, cid) => { _coffeMachine.WaterTank.FillWaterTank(); });
+                });
 
-            var eventElement = ioTCore.CreateEventElement(coffeeMachine, "waterlevel_warning");
+            coffeeMachine.AddChild(level);
+            
+            var fillService = new ActionServiceElement(
+                "fill_watertank", 
+                (element, cid) => { _coffeMachine.WaterTank.FillWaterTank(); });
+
+            coffeeMachine.AddChild(fillService);
+
+            var eventElement = new EventElement("waterlevel_warning");
+            coffeeMachine.AddChild(eventElement);
 
             _coffeMachine.WaterTank.LevelChanged += (s, e) =>
             {
@@ -158,9 +204,7 @@ namespace CoffeeMachine
                 }
             };
             
-
-
-            ioTCore.RaiseTreeChanged();
+            ioTCore.Root.RaiseTreeChanged();
         }
     }
 
@@ -171,9 +215,11 @@ namespace CoffeeMachine
 
         [Option('u', "http-uri", Required = true, HelpText = "Uri to start the http server", Default = "http://127.0.0.1:8001")]
         public string HttpUri { get; set; }
-        
+
+        [Option('o', "opc-uri", Required = false, HelpText = "Uri to start the opc server", Default = "opc.tcp://127.0.0.1:62546")]
+        public string OpcUri { get; set; }
+
         [Option('l', "log-config", Required = false, HelpText = "Optional logger configuration file")]
         public string LogConfigFile { get; set; }
     }
-
 }

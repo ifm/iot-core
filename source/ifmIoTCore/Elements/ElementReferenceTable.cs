@@ -3,25 +3,13 @@
     using System.Collections.Generic;
     using System.Linq;
 
-    public enum ReferenceType
+    public class ElementReference : IElementReference
     {
-        Child,
-        Link
-    }
-
-    public enum ReferenceDirection
-    {
-        Forward,
-        Inverse
-    }
-
-    public class ElementReference
-    {
-        public readonly IBaseElement SourceElement;
-        public readonly IBaseElement TargetElement;
-        public readonly string Identifier;
-        public readonly ReferenceType Type;
-        public readonly ReferenceDirection Direction;
+        public IBaseElement SourceElement { get; }
+        public IBaseElement TargetElement { get; }
+        public string Identifier { get; }
+        public ReferenceType Type { get; }
+        public ReferenceDirection Direction { get; }
 
         public ElementReference(IBaseElement sourceElement,
             IBaseElement targetElement,
@@ -50,82 +38,60 @@
         }
     }
 
-    public class ElementReferenceTable
+    public class ElementReferenceTable : IElementReferenceTable
     {
-        public IEnumerable<ElementReference> ForwardReferences => _forwardReferences;
-        private List<ElementReference> _forwardReferences;
+        public IEnumerable<IElementReference> ForwardReferences => _forwardReferences;
+        private List<IElementReference> _forwardReferences;
 
-        public IEnumerable<ElementReference> InverseReferences => _inverseReferences;
-        private List<ElementReference> _inverseReferences;
+        public IEnumerable<IElementReference> InverseReferences => _inverseReferences;
+        private List<IElementReference> _inverseReferences;
 
-        public void AddForwardReference(IBaseElement sourceElement,
+        public IElementReference AddForwardReference(IBaseElement sourceElement,
             IBaseElement targetElement,
             string identifier,
             ReferenceType type)
         {
             var reference = new ElementReference(sourceElement, targetElement, identifier, type, ReferenceDirection.Forward);
-            _forwardReferences ??= new List<ElementReference>();
+            _forwardReferences ??= new List<IElementReference>();
             _forwardReferences.Add(reference);
+            return reference;
         }
 
-        public void AddInverseReference(IBaseElement sourceElement,
+        public IElementReference AddInverseReference(IBaseElement sourceElement,
             IBaseElement targetElement,
             string identifier,
             ReferenceType type)
         {
             var reference = new ElementReference(sourceElement, targetElement, identifier, type, ReferenceDirection.Inverse);
-            _inverseReferences ??= new List<ElementReference>();
+            _inverseReferences ??= new List<IElementReference>();
             _inverseReferences.Add(reference);
+            return reference;
         }
 
-        public bool RemoveForwardReference(IBaseElement sourceElement,
+        public IElementReference RemoveForwardReference(IBaseElement sourceElement,
             IBaseElement targetElement)
         {
             var reference = _forwardReferences?.FirstOrDefault(x => x.SourceElement == sourceElement && x.TargetElement == targetElement);
-            if (reference == null) return false;
-            if (!_forwardReferences.Remove(reference)) return false;
+            if (reference == null) return null;
+            if (!_forwardReferences.Remove(reference)) return null;
             if (_forwardReferences.Count == 0)
             {
                 _forwardReferences = null;
             }
-            return true;
+            return reference;
         }
 
-        public bool RemoveForwardReference(ElementReference reference)
-        {
-            if (_forwardReferences == null) return false;
-            if (reference == null) return false;
-            if (!_forwardReferences.Remove(reference)) return false;
-            if (_forwardReferences.Count == 0)
-            {
-                _forwardReferences = null;
-            }
-            return true;
-        }
-
-        public bool RemoveInverseReference(IBaseElement sourceElement,
+        public IElementReference RemoveInverseReference(IBaseElement sourceElement,
             IBaseElement targetElement)
         {
             var reference = _inverseReferences?.FirstOrDefault(x => x.SourceElement == sourceElement && x.TargetElement == targetElement);
-            if (reference == null) return false;
-            _inverseReferences.Remove(reference);
+            if (reference == null) return null;
+            if (!_inverseReferences.Remove(reference)) return null;
             if (_inverseReferences.Count == 0)
             {
                 _inverseReferences = null;
             }
-            return true;
-        }
-
-        public bool RemoveInverseReference(ElementReference reference)
-        {
-            if (_inverseReferences == null) return false;
-            if (reference == null) return false;
-            if (!_inverseReferences.Remove(reference)) return false;
-            if (_inverseReferences.Count == 0)
-            {
-                _inverseReferences = null;
-            }
-            return true;
+            return reference;
         }
 
         public void Clear()

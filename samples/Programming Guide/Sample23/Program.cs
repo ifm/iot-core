@@ -2,8 +2,8 @@
 {
     using System;
     using ifmIoTCore;
+    using ifmIoTCore.Logger;
     using ifmIoTCore.Logging.Log4Net;
-    using ifmIoTCore.Utilities;
 
     internal class Program
     {
@@ -12,8 +12,7 @@
             try
             {
                 var logger = new Logger(LogLevel.Info);
-                var ioTCore = IoTCoreFactory.Create("MyIoTCore", 
-                    logger);
+                var ioTCore = IoTCoreFactory.Create("MyIoTCore", null, logger);
 
                 logger.Info("Informational log");
 

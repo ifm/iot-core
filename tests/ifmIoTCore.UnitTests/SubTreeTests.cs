@@ -1,98 +1,92 @@
-﻿using ifmIoTCore.Converter.Json;
-using ifmIoTCore.NetAdapter.Http;
+﻿using ifmIoTCore.Common.Variant;
 
 namespace ifmIoTCore.UnitTests
 {
     using System.Linq;
+    using ifmIoTCore.Elements;
     using ifmIoTCore.Elements.ServiceData.Requests;
+    using ifmIoTCore.Elements.ServiceData.Responses;
     using NUnit.Framework;
-  
+    using Utilities;
+
     [TestFixture]
     public class SubTreeTests
     {
         [Test]
         public void TestSubTreeLevel4()
         {
-            var ioTCore1 = IoTCoreFactory.Create("id0", null);
-            using var clientNetAdapterFactory = new HttpClientNetAdapterFactory(new JsonConverter());
-            ioTCore1.RegisterClientNetAdapterFactory(clientNetAdapterFactory);
-            var ioTCore = ioTCore1;
-            var structureElementLevel1 = ioTCore.CreateStructureElement(ioTCore.Root, "level1");
-            var structureElementLevel2 = ioTCore.CreateStructureElement(structureElementLevel1, "level2");
-            var structureElementLevel3 = ioTCore.CreateStructureElement(structureElementLevel2, "level3");
-            var structureElementLevel4 = ioTCore.CreateStructureElement(structureElementLevel3, "level4");
+            var ioTCore = IoTCoreFactory.Create("id0");
+            var structureElementLevel1 = new StructureElement("level1");
+            ioTCore.Root.AddChild(structureElementLevel1, true);
+            var structureElementLevel2 = new StructureElement("level2");
+            structureElementLevel1.AddChild(structureElementLevel2, true); 
+            var structureElementLevel3 = new StructureElement("level3");
+            structureElementLevel2.AddChild(structureElementLevel3, true);
+            var structureElementLevel4 = new StructureElement("level4");
+            structureElementLevel3.AddChild(structureElementLevel4, true);
 
-            var result = ioTCore.Root.GetTree(new GetTreeRequestServiceData("/", null));
+            var getTreeService = ioTCore.Root.GetTreeServiceElement;
+
+            var result = Variant.ToObject<GetTreeResponseServiceData>(getTreeService.Invoke(Variant.FromObject(new GetTreeRequestServiceData("/", null))));
 
             var element4 = result.Subs.First(x => x.Identifier == "level1").Subs.First(x => x.Identifier == "level2").Subs
                 .First(x => x.Identifier == "level3").Subs.First(x => x.Identifier == "level4");
             
             Assert.NotNull(element4);
-
             Assert.AreEqual(structureElementLevel4.Address, element4.Address);
-
-            ioTCore.RemoveClientNetAdapterFactory(clientNetAdapterFactory);
-            clientNetAdapterFactory.Dispose();
         }
 
         [Test]
         public void TestSubTreeLevel3()
         {
-            var ioTCore1 = IoTCoreFactory.Create("id0", null);
+            var ioTCore = IoTCoreFactory.Create("id0");
+            var structureElementLevel1 = new StructureElement("level1");
+            ioTCore.Root.AddChild(structureElementLevel1, true);
+            var structureElementLevel2 = new StructureElement("level2");
+            structureElementLevel1.AddChild(structureElementLevel2, true);
+            var structureElementLevel3 = new StructureElement("level3");
+            structureElementLevel2.AddChild(structureElementLevel3, true);
+            var structureElementLevel4 = new StructureElement("level4");
+            structureElementLevel3.AddChild(structureElementLevel4, true);
 
-            using var clientNetAdapterFactory = new HttpClientNetAdapterFactory(new JsonConverter());
-            ioTCore1.RegisterClientNetAdapterFactory(clientNetAdapterFactory);
-            var ioTCore = ioTCore1;
-            var structureElementLevel1 = ioTCore.CreateStructureElement(ioTCore.Root, "level1");
-            var structureElementLevel2 = ioTCore.CreateStructureElement(structureElementLevel1, "level2");
-            var structureElementLevel3 = ioTCore.CreateStructureElement(structureElementLevel2, "level3");
-            var structureElementLevel4 = ioTCore.CreateStructureElement(structureElementLevel3, "level4");
+            var getTreeService = ioTCore.Root.GetTreeServiceElement;
 
-            var result = ioTCore.Root.GetTree(new GetTreeRequestServiceData("/", 3));
+            var result = Variant.ToObject<GetTreeResponseServiceData>(getTreeService.Invoke(Variant.FromObject(new GetTreeRequestServiceData("/", 3))));
 
             var element3 = result.Subs.First(x => x.Identifier == "level1").Subs.First(x => x.Identifier == "level2")
                 .Subs
                 .FirstOrDefault(x => x.Identifier == "level3");
-
             Assert.NotNull(element3);
 
             var element4 = element3.Subs?.FirstOrDefault(x => x.Identifier == "level4");
-
             Assert.Null(element4);
-
             Assert.AreEqual(structureElementLevel3.Address, element3.Address);
-
-            clientNetAdapterFactory.Dispose();
         }
 
         [Test]
         public void TestSubTreeLevel2()
         {
-            var ioTCore1 = IoTCoreFactory.Create("id0", null);
+            var ioTCore = IoTCoreFactory.Create("id0");
+            var structureElementLevel1 = new StructureElement("level1");
+            ioTCore.Root.AddChild(structureElementLevel1, true);
+            var structureElementLevel2 = new StructureElement("level2");
+            structureElementLevel1.AddChild(structureElementLevel2, true);
+            var structureElementLevel3 = new StructureElement("level3");
+            structureElementLevel2.AddChild(structureElementLevel3, true);
+            var structureElementLevel4 = new StructureElement("level4");
+            structureElementLevel3.AddChild(structureElementLevel4, true);
 
-            using var clientNetAdapterFactory = new HttpClientNetAdapterFactory(new JsonConverter());
-            ioTCore1.RegisterClientNetAdapterFactory(clientNetAdapterFactory);
-            var ioTCore = ioTCore1;
-            var structureElementLevel1 = ioTCore.CreateStructureElement(ioTCore.Root, "level1");
-            var structureElementLevel2 = ioTCore.CreateStructureElement(structureElementLevel1, "level2");
-            var structureElementLevel3 = ioTCore.CreateStructureElement(structureElementLevel2, "level3");
-            var structureElementLevel4 = ioTCore.CreateStructureElement(structureElementLevel3, "level4");
+            var getTreeService = ioTCore.Root.GetTreeServiceElement;
 
-            var result = ioTCore.Root.GetTree(new GetTreeRequestServiceData("/", 2));
+            var result = Variant.ToObject<GetTreeResponseServiceData>(getTreeService.Invoke(Variant.FromObject(new GetTreeRequestServiceData("/", 2))));
 
             var element2 = result.Subs.First(x => x.Identifier == "level1").Subs.First(x => x.Identifier == "level2");
-
             Assert.NotNull(element2);
-
             if (element2.Subs != null)
             {
                 Assert.Null(element2.Subs.FirstOrDefault(x=>x.Identifier == "level3"));
             }
-            
             Assert.AreEqual(structureElementLevel2.Address, element2.Address);
-
-            ioTCore.RemoveClientNetAdapterFactory(clientNetAdapterFactory);
-            clientNetAdapterFactory.Dispose();
         }
     }
 }

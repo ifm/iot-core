@@ -123,6 +123,9 @@
   <data name="AddElementToLinkNotAllowed" xml:space="preserve">
     <value>Adding an element to a link element is not allowed</value>
   </data>
+  <data name="AddLinkNotAllowed" xml:space="preserve">
+    <value>The link between '{0}' and '{1}' would cause a circular dependency and is therefore not allowed</value>
+  </data>
   <data name="ArgumentNullOrEmpty" xml:space="preserve">
     <value>The argument with name '{0}' must not be null or empty</value>
   </data>
@@ -165,6 +168,9 @@
   <data name="InvalidIdentifier" xml:space="preserve">
     <value>The identifier '{0}' is invalid</value>
   </data>
+  <data name="InvalidMessageAddress" xml:space="preserve">
+    <value>The adr field of a message may not be null or empty</value>
+  </data>
   <data name="InvalidMessageCode" xml:space="preserve">
     <value>The message code '{0}' is invalid</value>
   </data>
@@ -183,6 +189,9 @@
   <data name="IoTCoreStopped" xml:space="preserve">
     <value>The IoTCore has stopped</value>
   </data>
+  <data name="LinkAlreadyExists" xml:space="preserve">
+    <value>The link between '{0}' and '{1}' already exists</value>
+  </data>
   <data name="LinksNotModifiable" xml:space="preserve">
     <value>Links are not modifiable</value>
   </data>
@@ -195,6 +204,9 @@
   <data name="ParameterNotSpecified" xml:space="preserve">
     <value>The parameter '{0}' is not specified</value>
   </data>
+  <data name="RootElementAlreadyExists" xml:space="preserve">
+    <value>The root element already exists</value>
+  </data>
   <data name="SendEventFailed" xml:space="preserve">
     <value>Sending event to '{0}' failed with error '{1}'</value>
   </data>
@@ -205,7 +217,7 @@
     <value>The data for service '{0}' is empty. Please check the 'data' field in your request</value>
   </data>
   <data name="ServiceExecutionFailed" xml:space="preserve">
-    <value>Service {0} failed. Message: {1}; code {2}</value>
+    <value>Service '{0}' failed; message: '{1}'</value>
   </data>
   <data name="ServiceNotImplemented" xml:space="preserve">
     <value>The service '{0}' is not implemented</value>

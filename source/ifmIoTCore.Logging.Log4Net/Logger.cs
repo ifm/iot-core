@@ -3,6 +3,7 @@
     using System;
     using System.IO;
     using System.Reflection;
+    using ifmIoTCore.Logger;
     using log4net;
     using log4net.Appender;
     using log4net.Config;
@@ -10,8 +11,9 @@
     using log4net.Layout;
     using log4net.Repository.Hierarchy;
     using Utilities;
+    using ILogger = ifmIoTCore.Logger.ILogger;
 
-    public class Logger : Utilities.ILogger
+    public class Logger : ILogger
     {
         private readonly ILog _logger;
 

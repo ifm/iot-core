@@ -6,7 +6,6 @@
     using ifmIoTCore.Elements;
     using ifmIoTCore.Elements.Formats;
     using ifmIoTCore.Elements.Valuations;
-    using ifmIoTCore.Utilities;
 
     internal class Program
     {
@@ -16,17 +15,12 @@
             {
                 var ioTCore = IoTCoreFactory.Create("MyIoTCore");
 
-                var struct1 = ioTCore.CreateStructureElement(ioTCore.Root, 
-                    "struct1", 
-                    null,
-                    new List<string> { "profile1" });
+                var struct1 = new StructureElement("struct1");
+                ioTCore.Root.AddChild(struct1);
 
-                ioTCore.CreateDataElement<int>(struct1, 
-                    "enum1", 
+                var enum1 = new DataElement<int>("enum1",
                     GetEnum1, 
-                    SetEnum1, 
-                    true, 
-                    true, 
+                    SetEnum1,
                     format: new IntegerEnumFormat(new IntegerEnumValuation(
                         new Dictionary<string, string>
                         {
@@ -35,6 +29,7 @@
                             {"2", "two"}, 
                             {"3", "three"}
                         }, _enum1)));
+                struct1.AddChild(enum1);
             }
             catch (Exception e)
             {
@@ -43,12 +38,12 @@
             Console.ReadLine();
         }
 
-        private static int GetEnum1(IBaseElement element)
+        private static int GetEnum1(IDataElement element)
         {
             return _enum1;
         }
 
-        private static void SetEnum1(IBaseElement element, int value)
+        private static void SetEnum1(IDataElement element, int value)
         {
             _enum1 = value;
         }

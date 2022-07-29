@@ -4,39 +4,38 @@
     using System.Net;
     using System.Threading;
     using ifmIoTCore;
-    using ifmIoTCore.Converter.Json;
     using ifmIoTCore.Elements;
+    using ifmIoTCore.Logger;
+    using ifmIoTCore.MessageConverter.Json.Newtonsoft;
     using ifmIoTCore.Messages;
-    using ifmIoTCore.NetAdapter;
     using ifmIoTCore.NetAdapter.Http;
     using ifmIoTCore.NetAdapter.Mqtt;
-    using ifmIoTCore.Utilities;
 
     class Program
     {
         static void Main(string[] args)
         {
-            var ioTCore = IoTCoreFactory.Create("test", new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Warning));
+            var ioTCore = IoTCoreFactory.Create("test", null, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Warning));
 
-            MqttServerNetAdapter mqttServerNetAdapter = new MqttServerNetAdapter(ioTCore, ioTCore.Root, new JsonConverter(), new IPEndPoint(IPAddress.Loopback, 1883), DisconnectionHandler, "commandTopic");
+            MqttServerNetAdapter mqttServerNetAdapter = new MqttServerNetAdapter(ioTCore, ioTCore.Root, new MessageConverter(), new IPEndPoint(IPAddress.Loopback, 1883), DisconnectionHandler, "commandTopic");
 
             void HandleRequestReceived (object sender, RequestMessageEventArgs e)
             {
-                e.Response = ioTCore.HandleRequest(e.Request);
+                e.ResponseMessage = ioTCore.HandleRequest(e.RequestMessage);
             }
 
-            mqttServerNetAdapter.RequestMessageReceived += HandleRequestReceived;
+            mqttServerNetAdapter.RequestReceived += HandleRequestReceived;
 
             void HandleEventReceived(object sender, EventMessageEventArgs e)
             {
                 ioTCore.HandleEvent(e.EventMessage);
             }
 
-            mqttServerNetAdapter.EventMessageReceived += HandleEventReceived;
+            mqttServerNetAdapter.EventReceived += HandleEventReceived;
 
             ioTCore.RegisterServerNetAdapter(mqttServerNetAdapter);
 
-            HttpServerNetAdapter httpServerNetAdapter = new HttpServerNetAdapter(ioTCore, new Uri("http://127.0.0.1:8090"),new JsonConverter());
+            HttpServerNetAdapter httpServerNetAdapter = new HttpServerNetAdapter(ioTCore, new Uri("http://127.0.0.1:8090"), new MessageConverter());
             ioTCore.RegisterServerNetAdapter(httpServerNetAdapter);
 
             httpServerNetAdapter.Start();
@@ -44,15 +43,18 @@
 
             using (var manualResetEvent = new ManualResetEventSlim()) {
 
-                var stopServiceElement = ioTCore.CreateActionServiceElement(ioTCore.Root, "stop", 
-                    (element, i) => { manualResetEvent.Set(); });
+                var stopServiceElement = new ActionServiceElement("stop",
+                    (element, i) => { manualResetEvent.Set(); }
+                    );
+
+                ioTCore.Root.AddChild(stopServiceElement);
 
                 manualResetEvent.Wait();
             }
 
             httpServerNetAdapter.Dispose();
-            mqttServerNetAdapter.RequestMessageReceived -= HandleRequestReceived;
-            mqttServerNetAdapter.EventMessageReceived -= HandleEventReceived;
+            mqttServerNetAdapter.RequestReceived -= HandleRequestReceived;
+            mqttServerNetAdapter.EventReceived -= HandleEventReceived;
             mqttServerNetAdapter.Dispose();
 
 

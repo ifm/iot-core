@@ -1,15 +1,15 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <AssemblyVersion>2.0.19</AssemblyVersion>
-    <Version>2.0.19</Version>
+    <AssemblyVersion>2.1.6</AssemblyVersion>
+    <Version>2.1.6</Version>
     <Company>ifm ecomatic gmbh</Company>
     <Copyright>Copyright © ifm ecomatic gmbh. All rights reserved.</Copyright>
     <LangVersion>8</LangVersion>
-    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <IsPackable>true</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="log4net" Version="2.0.12" />
+    <PackageReference Include="log4net" Version="2.0.14" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ifmIoTCore\ifmIoTCore.csproj" />

@@ -1,7 +1,6 @@
 ﻿namespace Sample05
 {
     using System;
-    using System.Collections.Generic;
     using ifmIoTCore;
     using ifmIoTCore.Elements;
     using ifmIoTCore.Elements.Formats;
@@ -14,19 +13,14 @@
             {
                 var ioTCore = IoTCoreFactory.Create("MyIoTCore");
 
-                var struct1 = ioTCore.CreateStructureElement(ioTCore.Root, 
-                    "struct1", 
-                    null,
-                    new List<string> { "profile1" });
+                var struct1 = new StructureElement("struct1");
+                ioTCore.Root.AddChild(struct1);
 
-                ioTCore.CreateDataElement<bool>(struct1, 
-                    "bool1", 
+                var bool1 = new DataElement<bool>("bool1",
                     GetBool1, 
-                    SetBool1, 
-                    true, 
-                    true, 
-                    true, 
+                    SetBool1,
                     format: new BooleanFormat());
+                struct1.AddChild(bool1);
             }
             catch (Exception e)
             {
@@ -35,12 +29,12 @@
             Console.ReadLine();
         }
 
-        private static bool GetBool1(IBaseElement element)
+        private static bool GetBool1(IDataElement element)
         {
             return _bool1;
         }
 
-        private static void SetBool1(IBaseElement element, bool value)
+        private static void SetBool1(IDataElement element, bool value)
         {
             _bool1 = value;
         }

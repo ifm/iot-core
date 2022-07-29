@@ -1,26 +1,38 @@
 ﻿namespace ifmIoTCore.Elements.ServiceData
 {
-    using Newtonsoft.Json;
-    using Newtonsoft.Json.Linq;
+    using Common.Variant;
 
     public class CodeDataPair
     {
         /// <summary>
         /// The code of the query
         /// </summary>
-        [JsonProperty("code", Required = Required.Always)]
-        public readonly int Code;
+        [VariantProperty("code", Required = true)]
+        public int Code { get; set; }
 
         /// <summary>
         /// The value of the element
         /// </summary>
-        [JsonProperty("data", Required = Required.Default)]
-        public readonly JToken Data;
+        [VariantProperty("data", Required = true)]
+        public Variant Data { get; set; }
 
-        public CodeDataPair(int code, JToken data)
+        /// <summary>
+        /// The parameterless constructor for the variant converter
+        /// </summary>
+        [VariantConstructor]
+        public CodeDataPair()
         {
-            this.Code = code;
-            this.Data = data;
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the class
+        /// </summary>
+        /// <param name="code"></param>
+        /// <param name="data"></param>
+        public CodeDataPair(int code, Variant data)
+        {
+            Code = code;
+            Data = data;
         }
     }
 }

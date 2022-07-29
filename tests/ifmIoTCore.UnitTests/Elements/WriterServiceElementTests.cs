@@ -1,8 +1,12 @@
-﻿namespace ifmIoTCore.UnitTests.Elements
+﻿using ifmIoTCore.Common.Variant;
+
+namespace ifmIoTCore.UnitTests.Elements
 {
+    using ifmIoTCore.Elements;
     using NUnit.Framework;
     using Messages;
     using Newtonsoft.Json.Linq;
+    using Utilities;
 
     [TestFixture]
     class WriterServiceElementTests
@@ -11,118 +15,133 @@
         public void WriterServiceElement_Invoked_AcceptsUserData()
         {
             // Given
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            var struct1 = ioTCore.CreateStructureElement(ioTCore.Root, "struct1");
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+            var struct1 = new StructureElement("struct1");
+            ioTCore.Root.AddChild(struct1, true);
             object argtest = null;
-            var service = ioTCore.CreateSetterServiceElement<complexData>(struct1, 
-                "writerServiceUserData",
+            var service = new SetterServiceElement("writerServiceUserData",
                 (sender, data, cid) =>
                 {
                     argtest = data;
                 });
+            struct1.AddChild(service, true);
 
             // When
-            Message response = ioTCore.HandleRequest(new RequestMessage(cid: 1, address: "/struct1/writerServiceUserData", JToken.FromObject(new complexData())));
+            var response = ioTCore.HandleRequest(new Message(RequestCodes.Request, 1, "/struct1/writerServiceUserData", Variant.FromObject(new complexData())));
             
             // Then
             Assert.IsNotNull(argtest);
-            Assert.AreEqual(argtest, new complexData());
+            Assert.AreEqual(Variant.ToObject<complexData>((Variant)argtest), new complexData());
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T211")]
         public void WriterServiceElement_Invoked_AcceptsFloat()
         {
             // Given
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            var struct1 = ioTCore.CreateStructureElement(ioTCore.Root, "struct1");
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+            var struct1 = new StructureElement("struct1");
+            ioTCore.Root.AddChild(struct1, true);
             object argtest = null;
-            var service = ioTCore.CreateSetterServiceElement<float>(struct1, 
-                "writerServiceFloat",
+            var service = new SetterServiceElement("writerServiceFloat",
                 (sender, data, cid) => { argtest = data; });
+            struct1.AddChild(service, true);
 
             // When
-            Message response = ioTCore.HandleRequest(new RequestMessage(cid: 1, address: "/struct1/writerServiceFloat", 42f));
+            var response = ioTCore.HandleRequest(new Message(RequestCodes.Request, 1, "/struct1/writerServiceFloat", new VariantValue(42f)));
             
             // Then
             Assert.IsNotNull(argtest);
-            Assert.AreEqual((float)argtest, 42f, double.Epsilon);
+            Assert.AreEqual((float)(VariantValue)argtest, 42f, double.Epsilon);
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T211")]
         public void WriterServiceElement_Invoked_AcceptsBool()
         {
             // Given
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            var struct1 = ioTCore.CreateStructureElement(ioTCore.Root, "struct1");
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+            var struct1 = new StructureElement("struct1");
+            ioTCore.Root.AddChild(struct1, true);
             object argtest = null;
-            var service = ioTCore.CreateSetterServiceElement<bool>(struct1,
-                "writerServiceBool",
-                (sender, data, cid) => { argtest = data; });
+            var service = new SetterServiceElement("writerServiceBool",
+                (sender, data, cid) =>
+                {
+                    argtest = data;
+                });
+            struct1.AddChild(service, true);
 
             // When
-            Message response = ioTCore.HandleRequest(new RequestMessage(cid: 1, address: "/struct1/writerServiceBool", true));
+            var response = ioTCore.HandleRequest(new Message(RequestCodes.Request, 1, "/struct1/writerServiceBool", new VariantValue(true)));
             
             // Then
             Assert.IsNotNull(argtest);
-            Assert.That(argtest, Is.EqualTo(true));
+            Assert.That((bool)(VariantValue)argtest, Is.EqualTo(true));
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T211")]
         public void WriterServiceElement_Invoked_AcceptsString()
         {
             // Given
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            var struct1 = ioTCore.CreateStructureElement(ioTCore.Root, "struct1");
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+            var struct1 = new StructureElement("struct1");
+            ioTCore.Root.AddChild(struct1, true);
             object argtest = null;
-            var service = ioTCore.CreateSetterServiceElement<string>(struct1, "writerServiceString",
+            var service = new SetterServiceElement("writerServiceString",
                 (sender, data, cid) => { argtest = data; });
+            struct1.AddChild(service, true);
 
             // When
-            Message response = ioTCore.HandleRequest(new RequestMessage(cid: 1, address: "/struct1/writerServiceString", "Forty Two"));
+            var response = ioTCore.HandleRequest(new Message(RequestCodes.Request, 1, "/struct1/writerServiceString", new VariantValue("Forty Two")));
             
             // Then
             Assert.IsNotNull(argtest);
-            Assert.That(argtest, Is.EqualTo("Forty Two"));
+            Assert.That((string)(VariantValue)argtest, Is.EqualTo("Forty Two"));
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T211")]
         public void WriterServiceElement_Invoked_AcceptsInt()
         {
             // Given
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            var struct1 = ioTCore.CreateStructureElement(ioTCore.Root, "struct1");
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+            var struct1 = new StructureElement("struct1");
+            ioTCore.Root.AddChild(struct1, true);
             object argtest = null;
-            var service = ioTCore.CreateSetterServiceElement<int>(struct1, 
-                "writerServiceInt",
+            var service = new SetterServiceElement("writerServiceInt",
                 (sender, data, cid) => { argtest = data; });
+            struct1.AddChild(service, true);
 
             // When
-            Message response = ioTCore.HandleRequest(new RequestMessage(cid:1, address:"/struct1/writerserviceint", 42));
+            var response = ioTCore.HandleRequest(new Message(RequestCodes.Request, 1, "/struct1/writerserviceint", new VariantValue(42)));
 
             // Then
             Assert.IsNotNull(argtest);
-            Assert.That(argtest, Is.EqualTo(42));
+            Assert.That((int)(VariantValue)argtest, Is.EqualTo(42));
 
             // When
-            Message response2 = ioTCore.HandleRequest(new RequestMessage(cid:1, address:"/struct1/writerserviceint", JToken.FromObject(42)));
+            var response2 = ioTCore.HandleRequest(new Message(RequestCodes.Request, 1, "/struct1/writerserviceint", Variant.FromObject(42)));
 
             // Then
             Assert.IsNotNull(argtest);
-            Assert.That(argtest, Is.EqualTo(42));
+            Assert.That((int)(VariantValue)argtest, Is.EqualTo(42));
         }
 
+        [Ignore("Since there are no more generics on the servicelelements, they are not bound to a single type. Please refactor or delete test.")]
         [Test, Property("TestCaseKey", "IOTCS-T86")]
         public void Error530InvalidData_WhenProvidedOtherDataTypeTo_WriterServiceElement_AcceptingInt()
         {
             // Given
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            var struct1 = ioTCore.CreateStructureElement(ioTCore.Root, "struct1");
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+            var struct1 = new StructureElement("struct1");
+            ioTCore.Root.AddChild(struct1);
             object argtest = null;
-            var service = ioTCore.CreateSetterServiceElement<int>(struct1, "writerServiceInt",
-                (sender, data, cid) => { argtest = data; });
+            var service = new SetterServiceElement("writerServiceInt",
+                (sender, data, cid) =>
+                {
+                    argtest = data;
+                });
+            struct1.AddChild(service);
 
             // When
-            Message response = ioTCore.HandleRequest(new RequestMessage(cid:1, address:"/struct1/writerserviceint", JToken.FromObject(new complexData())));
+            var response = ioTCore.HandleRequest(new Message(RequestCodes.Request, 1, "/struct1/writerserviceint", Variant.FromObject(new complexData())));
 
             // Then
             Assert.AreEqual(422, ResponseCodes.DataInvalid);

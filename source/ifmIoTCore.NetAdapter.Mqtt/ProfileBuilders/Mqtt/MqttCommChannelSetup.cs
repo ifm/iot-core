@@ -1,5 +1,6 @@
 ﻿namespace ifmIoTCore.NetAdapter.Mqtt.ProfileBuilders.Mqtt
 {
+    using Common;
     using Utilities;
 
     public class MqttCommChannelSetup : NotifyPropertyChangedBase

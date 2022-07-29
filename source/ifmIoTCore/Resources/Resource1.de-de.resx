@@ -123,6 +123,9 @@
   <data name="AddElementToLinkNotAllowed" xml:space="preserve">
     <value>Hinzufügen eines Elements zu einem Link-Element ist nicht erlaubt</value>
   </data>
+  <data name="AddLinkNotAllowed" xml:space="preserve">
+    <value>Der Link zwischen '{0}' und '{1}' würde eine Kreisabhängigkeit verursachen und ist daher nicht erlaubt</value>
+  </data>
   <data name="ArgumentNullOrEmpty" xml:space="preserve">
     <value>Das Argument mit dem Namen '{0}' darf nicht null oder leer sein</value>
   </data>
@@ -165,6 +168,9 @@
   <data name="InvalidIdentifier" xml:space="preserve">
     <value>Der Identifier '{0}' ist ungültig</value>
   </data>
+  <data name="InvalidMessageAddress" xml:space="preserve">
+    <value>Das 'adr' Feld einer Nachricht darf nicht leer oder null sein</value>
+  </data>
   <data name="InvalidMessageCode" xml:space="preserve">
     <value>Der Nachrichtencode '{0}' ist ungültig</value>
   </data>
@@ -183,6 +189,9 @@
   <data name="IoTCoreStopped" xml:space="preserve">
     <value>Der IoTCore ist gestoppt</value>
   </data>
+  <data name="LinkAlreadyExists" xml:space="preserve">
+    <value>Der Link zwischen '{0}' und '{1}' existiert bereits</value>
+  </data>
   <data name="LinksNotModifiable" xml:space="preserve">
     <value>Links können nicht verändert werden</value>
   </data>
@@ -195,6 +204,9 @@
   <data name="ParameterNotSpecified" xml:space="preserve">
     <value>The parameter '{0}' is not specified</value>
   </data>
+  <data name="RootElementAlreadyExists" xml:space="preserve">
+    <value>Das Wurzelelement exisiert bereits</value>
+  </data>
   <data name="SendEventFailed" xml:space="preserve">
     <value>Senden eines Ereignisses an '{0}' ist mit Fehler '{1}' fehlgeschlagen</value>
   </data>
@@ -205,7 +217,7 @@
     <value>Die Daten für Service '{0}' sind leer. Bitte überprüfen Sie das 'data' Feld in Ihrem Aufruf</value>
   </data>
   <data name="ServiceExecutionFailed" xml:space="preserve">
-    <value>Service {0} is fehlgeschlagen. Nachricht: {1}; Code {2}</value>
+    <value>Service '{0}' ist fehlgeschlagen. Nachricht: '{1}'</value>
   </data>
   <data name="ServiceNotImplemented" xml:space="preserve">
     <value>Der Service '{0}' ist nicht implementiert</value>

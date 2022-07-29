@@ -1,6 +1,6 @@
 ﻿namespace ifmIoTCore.Profiles.DeviceManagement.ServiceData.Requests
 {
-    using Newtonsoft.Json;
+    using Common.Variant;
 
     /// <summary>
     /// Represents the incoming data for a AddRoute service call
@@ -10,8 +10,16 @@
         /// <summary>
         /// The identifier name for the routed IoTCore
         /// </summary>
-        [JsonProperty("identifier", Required = Required.Always)]
-        public readonly string Identifier;
+        [VariantProperty("identifier", Required = true)]
+        public string Identifier { get; set; }
+
+        /// <summary>
+        /// The parameterless constructor for the variant converter
+        /// </summary>
+        [VariantConstructor]
+        public RemoveRouteRequestServiceData()
+        {
+        }
 
         /// <summary>
         /// Initializes a new instance of the class

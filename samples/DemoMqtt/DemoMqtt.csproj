@@ -1,22 +1,21 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <Platforms>AnyCPU</Platforms>
     <TargetFramework>net472</TargetFramework>
   </PropertyGroup>
-
   <ItemGroup>
-    <ProjectReference Include="..\..\source\ifmIoTCore.Converter.Json\ifmIoTCore.Converter.Json.csproj" />
     <ProjectReference Include="..\..\source\ifmIoTCore.Logging.Log4Net\ifmIoTCore.Logging.Log4Net.csproj" />
+    <ProjectReference Include="..\..\source\ifmIoTCore.MessageConverter.Json.Newtonsoft\ifmIoTCore.MessageConverter.Json.Newtonsoft.csproj" />
     <ProjectReference Include="..\..\source\ifmIoTCore.NetAdapter.Http\ifmIoTCore.NetAdapter.Http.csproj" />
     <ProjectReference Include="..\..\source\ifmIoTCore.NetAdapter.Mqtt\ifmIoTCore.NetAdapter.Mqtt.csproj" />
+    <ProjectReference Include="..\..\source\ifmIoTCore.Profiles.Base\ifmIoTCore.Profiles.Base.csproj" />
+    <ProjectReference Include="..\..\source\ifmIoTCore.Profiles.DeviceManagement\ifmIoTCore.Profiles.DeviceManagement.csproj" />
     <ProjectReference Include="..\..\source\ifmIoTCore\ifmIoTCore.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="log4net">
-      <Version>2.0.12</Version>
-    </PackageReference>
+    <PackageReference Include="CommandLineParser" Version="2.8.0" />
+    <PackageReference Include="log4net" Version="2.0.14" />
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies">
       <Version>1.0.0</Version>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

@@ -1,17 +1,18 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <AssemblyVersion>2.0.19</AssemblyVersion>
-    <Version>2.0.19-beta</Version>
+    <AssemblyVersion>2.1.6</AssemblyVersion>
+    <Version>2.1.6</Version>
     <Company>ifm ecomatic gmbh</Company>
     <Copyright>Copyright © ifm ecomatic gmbh. All rights reserved.</Copyright>
     <UserSecretsId>71ab388f-6271-425f-9cd8-3d73cd7bde91</UserSecretsId>
-    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <IsPackable>true</IsPackable>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="MQTTnet" Version="3.1.0" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\ifmIoTCore.NetAdapter.Base\ifmIoTCore.NetAdapter.Base.csproj" />
     <ProjectReference Include="..\ifmIoTCore\ifmIoTCore.csproj" />
   </ItemGroup>
 </Project>

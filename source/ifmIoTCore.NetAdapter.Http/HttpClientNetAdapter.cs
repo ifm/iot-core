@@ -10,11 +10,11 @@ namespace ifmIoTCore.NetAdapter.Http
     public class HttpClientNetAdapter : IClientNetAdapter
     {
         private readonly HttpClient _client;
-        private readonly IConverter _converter;
+        private readonly IMessageConverter _converter;
         private readonly Uri _remoteUri;
         private readonly bool _keepAlive;
 
-        public HttpClientNetAdapter(Uri remoteUri, IConverter converter, TimeSpan timeout, bool keepAlive)
+        public HttpClientNetAdapter(Uri remoteUri, IMessageConverter converter, TimeSpan timeout, bool keepAlive)
         {
             _remoteUri = remoteUri;
             _converter = converter;
@@ -32,41 +32,25 @@ namespace ifmIoTCore.NetAdapter.Http
 
         public DateTime LastUsed { get; private set; }
 
-        public Uri GetLocalUri()
-        {
-            using (var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
-            {
-                return new Uri($"http://{GetLocalEndpoint(socket, _remoteUri)}");
-            }
-        }
-
         public Uri GetRemoteUri()
         {
             return _remoteUri;
         }
 
-        public ResponseMessage SendRequest(RequestMessage message, TimeSpan? timeout)
+        public Message SendRequest(Message requestMessage, TimeSpan? timeout)
         {
             LastUsed = DateTime.Now;
-            var requestString = _converter.Serialize(message);
+            var requestString = _converter.Serialize(requestMessage);
 
             var task = _client.PostAsync(_remoteUri, new StringContent(requestString, Encoding.UTF8, _converter.ContentType));
             var httpResponse = task.GetAwaiter().GetResult();
             var responseString = httpResponse.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-            return _converter.Deserialize<ResponseMessage>(responseString);
+            return _converter.Deserialize(responseString);
         }
 
-        public void SendEvent(EventMessage message)
+        public void SendEvent(Message eventMessage)
         {
-            SendEventFireAndForget(message);
-        }
-
-        public void Disconnect()
-        {
-            if (!_keepAlive)
-            {
-                _client.Dispose();
-            }
+            SendEventFireAndForget(eventMessage);
         }
 
         public void Dispose()
@@ -82,25 +66,17 @@ namespace ifmIoTCore.NetAdapter.Http
             return localEndPoint as IPEndPoint;
         }
 
-        private void SendEventExpectResponse(EventMessage message)
-        {
-            LastUsed = DateTime.Now;
-            var requestString = _converter.Serialize(message);
-            var task = _client.PostAsync(_remoteUri, new StringContent(requestString, Encoding.UTF8, _converter.ContentType));
-            var response = task.GetAwaiter().GetResult();
-        }
-
-        private void SendEventFireAndForget(EventMessage message)
+        private void SendEventFireAndForget(Message eventMessage)
         {
             var httpNewLine = "\r\n";
 
             LastUsed = DateTime.Now;
-            var requestString = _converter.Serialize(message);
+            var requestString = _converter.Serialize(eventMessage);
 
             using (var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
             {
                 socket.Connect(_remoteUri.Host, _remoteUri.Port);
-                var content = $"POST {message.Address} HTTP/1.0{httpNewLine}Content-Type: {_converter.ContentType}{httpNewLine}Content-Length: {requestString.Length}{httpNewLine}{httpNewLine}{requestString}";
+                var content = $"POST {eventMessage.Address} HTTP/1.0{httpNewLine}Content-Type: {_converter.ContentType}{httpNewLine}Content-Length: {requestString.Length}{httpNewLine}{httpNewLine}{requestString}";
                 var byteArrayToSend = Encoding.UTF8.GetBytes(content);
                 socket.Send(byteArrayToSend);
                 socket.Close();

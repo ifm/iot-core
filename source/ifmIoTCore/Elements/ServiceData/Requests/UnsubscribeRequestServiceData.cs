@@ -1,7 +1,6 @@
 ﻿namespace ifmIoTCore.Elements.ServiceData.Requests
 {
-    using System;
-    using Newtonsoft.Json;
+    using Common.Variant;
 
     /// <summary>
     /// Represents the incoming data for a IEventElement.Unsubscribe service call
@@ -11,20 +10,28 @@
         /// <summary>
         /// The callback address of the subscription
         /// </summary>
-        [JsonProperty("callback", Required = Required.Always)]
-        public readonly string Callback;
+        [VariantProperty("callback", Required = true, AlternativeNames = new[] { "callbackurl" })]
+        public string Callback { get; set; }
 
         /// <summary>
         /// The id which identifies the subscription
         /// </summary>
-        [JsonProperty("subscribeid", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public readonly int? SubscriptionId;
+        [VariantProperty("subscribeid", IgnoredIfNull = true)]
+        public int? SubscriptionId { get; set; }
 
         /// <summary>
         /// true, if the corresponding subscribe request is deleted from storage; otherwise false. false is default
         /// </summary>
-        [JsonProperty("persist", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public readonly bool Persist;
+        [VariantProperty("persist", IgnoredIfNull = true)]
+        public bool Persist { get; set; }
+
+        /// <summary>
+        /// The parameterless constructor for the variant converter
+        /// </summary>
+        [VariantConstructor]
+        public UnsubscribeRequestServiceData()
+        {
+        }
 
         /// <summary>
         /// Initializes a new instance of the class

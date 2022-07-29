@@ -5,11 +5,12 @@
     using System.ComponentModel;
     using System.Linq;
     using System.Net;
+    using Common;
     using Elements;
     using Elements.Formats;
     using Elements.Valuations;
+    using Logger;
     using RunControlState;
-    using Utilities;
 
     internal class CommChannelSetupProfileProvider : NotifyPropertyChangedBase
     {
@@ -22,14 +23,14 @@
         private readonly State _stopped = new State("stopped");
         private readonly State _error = new State("error");
         
-        private IDataElement<string> _brokerIpElement;
-        private IDataElement<int> _brokerPortElement;
-        private IDataElement<string> _brokerTopicElement;
+        private IDataElement _brokerIpElement;
+        private IDataElement _brokerPortElement;
+        private IDataElement _brokerTopicElement;
         private IStructureElement _commChannelElement;
-        private IDataElement<string> _replyTopicElement;
+        private IDataElement _replyTopicElement;
         private IStructureElement _commChannelSetupElement;
         private string _preset = "stopped";
-        private IDataElement<string> _statusDataElement;
+        private IDataElement _statusDataElement;
         private readonly IElementManager _elementManager;
 
         public CommChannelSetupProfileProvider(IElementManager elementManager,
@@ -68,22 +69,19 @@
         {
             if (this._commChannelElement == null)
             {
-                this._commChannelElement = _elementManager.CreateStructureElement(this._mqttRoot, "mqttcmdchannel", profiles: new List<string> { "commchannel" });
+                this._commChannelElement = new StructureElement("mqttcmdchannel", profiles: new List<string> { "commchannel" });
+                _mqttRoot.AddChild(_commChannelElement);
 
-                this._statusDataElement = _elementManager.CreateDataElement<string>(_commChannelElement, 
-                    "status",
+                this._statusDataElement = new ReadOnlyDataElement<string>("status",
                     element => this._commChannelRunControlStateMachine.CurrentState?.Value?.ToString() ?? "unknown state",
-                    null, 
-                    true, 
-                    false);
-                _statusDataElement.DataChangedEventElement = _elementManager.CreateEventElement(_statusDataElement, Identifiers.DataChanged);
+                    createDataChangedEventElement: true);
+
+                _commChannelElement.AddChild(_statusDataElement);
 
                 this._commChannelRunControlStateMachine.PropertyChanged += CommChannelRunControlStateMachineOnPropertyChanged;
 
-                var runControlProfileBuilder = new RunControlProfileBuilder(_elementManager,
-                    targetElement: this._statusDataElement,
-                    startElement: _elementManager.CreateActionServiceElement(_statusDataElement,
-                        "start", 
+                var runControlProfileBuilder = new RunControlProfileBuilder(targetElement: this._statusDataElement,
+                    startElement: new ActionServiceElement("start",
                         (element, i) =>
                         {
                             try
@@ -96,9 +94,9 @@
                                 this._log.Error($"Failed to run 'start' of runcontrol in commchannel at: '{this._commChannelElement.Address}'.");
                                 throw;
                             }
-                        }),
-                    stopElement: _elementManager.CreateActionServiceElement(_statusDataElement,
-                        "stop", 
+                        })                        
+                    ,
+                    stopElement: new ActionServiceElement("stop", 
                         (element, i) =>
                         {
                             try
@@ -112,8 +110,7 @@
                                 throw;
                             }
                         }),
-                    resetElement: _elementManager.CreateActionServiceElement(_statusDataElement,
-                        "reset",
+                    resetElement: new ActionServiceElement("reset",
                         (element, i) =>
                             {
                                 if (this._commChannelRunControlStateMachine.IsCurrentState(this._stopped)) return;
@@ -131,77 +128,85 @@
 
                                 this._commChannelRunControlStateMachine.TrySetState(this._init, "reset");
                             }),
-                    presetElement: _elementManager.CreateDataElement<string>(_statusDataElement,
-                        "preset",
-                        element => this._preset, null, true,createSetDataServiceElement:false));
+                    presetElement: new DataElement<string>("preset",
+                        element => this._preset));
 
                 runControlProfileBuilder.Build();
 
-                _elementManager.CreateDataElement<string>(_commChannelElement, "type", element => "mqtt", null, true, false);
+                var typeElement = new ReadOnlyDataElement<string>("type", 
+                    element => "mqtt");
+
+                _commChannelElement.AddChild(typeElement);
             }
 
             if (this._commChannelSetupElement == null)
             {
-                this._commChannelSetupElement = _elementManager.CreateStructureElement(this._commChannelElement, "mqttCmdChannelSetup", profiles:new List<string>{ "mqttcmdchannelsetup" });
+                this._commChannelSetupElement = new StructureElement("mqttCmdChannelSetup", profiles:new List<string>{ "mqttcmdchannelsetup" });
+                _commChannelElement.AddChild(_commChannelSetupElement);
             }
 
             if (this._brokerIpElement == null)
             {
-                this._brokerIpElement = _elementManager.CreateDataElement<string>(_commChannelSetupElement,
-                    "brokerIP",
+                this._brokerIpElement = new DataElement<string>( "brokerIP",
                     element => this.MqttCommChannelSetup.BrokerIp,
                     (element, value) =>
                     {
-                        if (this.MqttCommChannelSetup.BrokerIp == value) return;
-                        this.MqttCommChannelSetup.BrokerIp = value;
-                    }, true, true,
+                        if (this.MqttCommChannelSetup.BrokerIp == (string)value) return;
+                        this.MqttCommChannelSetup.BrokerIp = (string)value;
+                    },
                     format: new StringFormat(new StringValuation(0, 50), "utf-8", "JSON"),
                     profiles: new List<string> {"parameter"});
                 // ToDo: Add a datachanged event?
+
+                _commChannelSetupElement.AddChild(_brokerIpElement);
 
             }
 
             if (this._brokerPortElement == null)
             {
-                this._brokerPortElement = _elementManager.CreateDataElement<int>(_commChannelSetupElement,
-                    "brokerPort",
+                this._brokerPortElement = new DataElement<int>("brokerPort",
                     element => this.MqttCommChannelSetup.BrokerPort,
                     (element, token) =>
                     {
-                        if (this.MqttCommChannelSetup.BrokerPort == token) return;
-                        this.MqttCommChannelSetup.BrokerPort = token;
-                    }, true, true, 
+                        if (this.MqttCommChannelSetup.BrokerPort == (int)token) return;
+                        this.MqttCommChannelSetup.BrokerPort = (int)token;
+                    }, 
                     format: new IntegerFormat(new IntegerValuation(0, 65535), "JSON"), 
                     profiles:new List<string>{ "parameter" });
                 // ToDo: Add a datachanged event?
+
+                _commChannelSetupElement.AddChild(_brokerPortElement);
             }
 
             if (this._brokerTopicElement == null)
             {
-                this._brokerTopicElement = _elementManager.CreateDataElement<string>(_commChannelSetupElement, 
-                    "cmdTopic",
+                this._brokerTopicElement = new DataElement<string>("cmdTopic", 
                     element => this.MqttCommChannelSetup.CommandTopic,
                     (element, value) =>
                     {
-                        if (value == this.MqttCommChannelSetup.CommandTopic) return;
-                        this.MqttCommChannelSetup.CommandTopic = value;
-                    }, true, true,
+                        if (this.MqttCommChannelSetup.CommandTopic == (string)value) return;
+                        this.MqttCommChannelSetup.CommandTopic = (string)value;
+                    },
                     format: new StringFormat(new StringValuation(0, 50), "utf-8", "JSON"), 
                     profiles: new List<string> { "parameter" });
                 // ToDo: Add a datachanged event?
+
+                _commChannelSetupElement.AddChild(_brokerTopicElement);
             }
 
             if (this._replyTopicElement == null)
             {
-                this._replyTopicElement = _elementManager.CreateDataElement<string>(_commChannelSetupElement, "defaultReplyTopic",
+                this._replyTopicElement = new DataElement<string>("defaultReplyTopic", 
                     element => this.MqttCommChannelSetup.ReplyTopic,
                     (element, value) =>
                     {
-                        if (value == this.MqttCommChannelSetup.ReplyTopic) return;
-                        this.MqttCommChannelSetup.ReplyTopic = value;
-                    }, true, true, 
+                        if (this.MqttCommChannelSetup.ReplyTopic == (string)value) return;
+                        this.MqttCommChannelSetup.ReplyTopic = (string)value;
+                    },
                     format: new StringFormat(new StringValuation(0, 50), "utf-8", "JSON"), profiles: new List<string> { "parameter" });
                 // ToDo: Add a datachanged event?
+
+                _commChannelSetupElement.AddChild(_replyTopicElement);
             }
         }
         
@@ -211,11 +216,12 @@
             this._serverNetAdapter.StateChanged -= this.OnMqttServerNetAdapterStateChanged;
             this.MqttCommChannelSetup.PropertyChanged -= MqttCommandChannelSetupOnPropertyChanged;
             this.MqttCommChannelSetup.PropertyChanging -= MqttCommandChannelSetupOnPropertyChanging;
-            _elementManager.RemoveElement(this._commChannelSetupElement, this._brokerIpElement);
-            _elementManager.RemoveElement(this._commChannelSetupElement, this._brokerPortElement);
-            _elementManager.RemoveElement(this._commChannelSetupElement, this._brokerTopicElement);
-            _elementManager.RemoveElement(this._commChannelSetupElement, this._replyTopicElement);
-            _elementManager.RemoveElement(this._commChannelElement, this._commChannelSetupElement);
+
+            this._commChannelSetupElement.RemoveChild(this._brokerIpElement);
+            this._commChannelSetupElement.RemoveChild(this._brokerPortElement);
+            this._commChannelSetupElement.RemoveChild(this._brokerTopicElement);
+            this._commChannelSetupElement.RemoveChild(this._replyTopicElement);
+            this._commChannelElement.RemoveChild(_commChannelSetupElement);
         }
 
         private void SetState(State nextState)

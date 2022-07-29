@@ -2,168 +2,114 @@
 {
     using System;
     using System.Collections.Generic;
+    using Common.Variant;
     using Exceptions;
-    using Newtonsoft.Json.Linq;
-    using Formats;
     using Messages;
     using Resources;
-    using Utilities;
 
-    internal class ActionServiceElement : BaseElement, IActionServiceElement
+    public class ActionServiceElement : BaseElement, IServiceElement
     {
-        private Action<IActionServiceElement, int?> _func;
+        protected Action<IServiceElement, int?> Func;
 
-        public ActionServiceElement(IBaseElement parent,
-            string identifier,
-            Action<IActionServiceElement, int?> func,
+        public ActionServiceElement(string identifier,
+            Action<IServiceElement, int?> func,
             Format format = null,
             List<string> profiles = null,
             string uid = null,
-            bool isHidden = false,
-            object context = null) :
-            base(parent, Identifiers.Service, identifier, format, profiles, uid, isHidden, context)
+            bool isHidden = false) :
+            base(Identifiers.Service, identifier, format, profiles, uid, isHidden)
         {
-            _func = func;
+            Func = func;
         }
 
-        public void Invoke(int? cid)
+        public Variant Invoke(Variant data, int? cid)
         {
-            if (_func == null)
+            if (Func == null)
             {
                 throw new IoTCoreException(ResponseCodes.NotImplemented, string.Format(Resource1.ServiceNotImplemented, Identifier));
             }
-            _func(this, cid);
-        }
 
-        JToken IServiceElement.Invoke(JToken data, int? cid)
-        {
-            Invoke(cid);
+            Func(this, cid);
             return null;
         }
-
-        protected override void Dispose(bool disposing)
-        {
-            _func = null;
-
-            base.Dispose(disposing);
-        }
     }
 
-    internal class GetterServiceElement<TOut> : BaseElement, IGetterServiceElement<TOut>
+    public class GetterServiceElement : BaseElement, IServiceElement
     {
-        private Func<IGetterServiceElement<TOut>, int?, TOut> _func;
+        protected Func<IServiceElement, int?, Variant> Func;
 
-        public GetterServiceElement(IBaseElement parent,
-            string identifier,
-            Func<IGetterServiceElement<TOut>, int?, TOut> func,
+        public GetterServiceElement(string identifier,
+            Func<IServiceElement, int?, Variant> func,
             Format format = null,
             List<string> profiles = null,
             string uid = null,
-            bool isHidden = false,
-            object context = null) :
-            base(parent, Identifiers.Service, identifier, format, profiles, uid, isHidden, context)
+            bool isHidden = false) :
+            base(Identifiers.Service, identifier, format, profiles, uid, isHidden)
         {
-            _func = func;
+            Func = func;
         }
 
-        public TOut Invoke(int? cid)
+        public Variant Invoke(Variant data, int? cid)
         {
-            if (_func == null)
+            if (Func == null)
             {
                 throw new IoTCoreException(ResponseCodes.NotImplemented, string.Format(Resource1.ServiceNotImplemented, Identifier));
             }
-            return _func(this, cid);
-        }
 
-        JToken IServiceElement.Invoke(JToken data, int? cid)
-        {
-            return Helpers.ToJson(Invoke(cid));
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            _func = null;
-
-            base.Dispose(disposing);
+            return Func(this, cid);
         }
     }
 
-    internal class SetterServiceElement<TIn> : BaseElement, ISetterServiceElement<TIn>
+    public class SetterServiceElement : BaseElement, IServiceElement
     {
-        private Action<ISetterServiceElement<TIn>, TIn, int?> _func;
+        protected Action<IServiceElement, Variant, int?> Func;
 
-        public SetterServiceElement(IBaseElement parent,
-            string identifier,
-            Action<ISetterServiceElement<TIn>, TIn, int?> func,
+        public SetterServiceElement(string identifier,
+            Action<IServiceElement, Variant, int?> func,
             Format format = null,
             List<string> profiles = null,
             string uid = null,
-            bool isHidden = false,
-            object context = null) :
-            base(parent, Identifiers.Service, identifier, format, profiles, uid, isHidden, context)
+            bool isHidden = false) :
+            base(Identifiers.Service, identifier, format, profiles, uid, isHidden)
         {
-            _func = func;
+            Func = func;
         }
 
-        public void Invoke(TIn data, int? cid)
+        public Variant Invoke(Variant data, int? cid)
         {
-            if (_func == null)
+            if (Func == null)
             {
                 throw new IoTCoreException(ResponseCodes.NotImplemented, string.Format(Resource1.ServiceNotImplemented, Identifier));
             }
-            _func(this, data, cid);
-        }
 
-        JToken IServiceElement.Invoke(JToken data, int? cid)
-        {
-            Invoke(Helpers.FromJson<TIn>(data), cid);
+            Func(this, data, cid);
             return null;
         }
-
-        protected override void Dispose(bool disposing)
-        {
-            _func = null;
-
-            base.Dispose(disposing);
-        }
     }
 
-    internal class ServiceElement<TIn, TOut> : BaseElement, IServiceElement<TIn, TOut>
+    public class ServiceElement : BaseElement, IServiceElement
     {
-        private Func<IServiceElement<TIn, TOut>, TIn, int?, TOut> _func;
+        protected Func<IServiceElement, Variant, int?, Variant> Func;
 
-        public ServiceElement(IBaseElement parent,
-            string identifier,
-            Func<IServiceElement<TIn, TOut>, TIn, int?, TOut> func,
+        public ServiceElement(string identifier,
+            Func<IServiceElement, Variant, int?, Variant> func,
             Format format = null,
             List<string> profiles = null,
             string uid = null,
-            bool isHidden = false,
-            object context = null) : 
-            base(parent, Identifiers.Service, identifier, format, profiles, uid, isHidden, context)
+            bool isHidden = false) :
+            base(Identifiers.Service, identifier, format, profiles, uid, isHidden)
         {
-            _func = func;
+            Func = func;
         }
 
-        public TOut Invoke(TIn data, int? cid)
+        public Variant Invoke(Variant data, int? cid)
         {
-            if (_func == null)
+            if (Func == null)
             {
                 throw new IoTCoreException(ResponseCodes.NotImplemented, string.Format(Resource1.ServiceNotImplemented, Identifier));
             }
-            return _func(this, data, cid);
-        }
 
-        JToken IServiceElement.Invoke(JToken data, int? cid)
-        {
-            return Helpers.ToJson(Invoke(Helpers.FromJson<TIn>(data), cid));
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            _func = null;
-
-            base.Dispose(disposing);
+            return Func(this, data, cid);
         }
     }
 }

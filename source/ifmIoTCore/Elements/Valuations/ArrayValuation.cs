@@ -1,7 +1,5 @@
 ﻿namespace ifmIoTCore.Elements.Valuations
 {
-    using Formats;
-
     /// <summary>
     /// Represents the valuation parameters for an array type data element
     /// </summary>

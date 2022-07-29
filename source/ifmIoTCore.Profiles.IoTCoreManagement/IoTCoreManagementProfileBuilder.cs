@@ -1,8 +1,10 @@
-﻿namespace ifmIoTCore.Profiles.IoTCoreManagement
+﻿using ifmIoTCore.Common.Variant;
+
+namespace ifmIoTCore.Profiles.IoTCoreManagement
 {
     using System;
     using System.Collections.Generic;
-    using Newtonsoft.Json.Linq;
+    using Base;
     using Elements;
     using Exceptions;
     using Messages;
@@ -10,7 +12,7 @@
     using ServiceData.Requests;
     using ServiceData.Responses;
 
-    public class IoTCoreManagementProfileBuilder
+    public class IoTCoreManagementProfileBuilder : BaseProfileBuilder
     {
         public const string ProfileName = "iotcore_management";
         public const string AddElementName = "addelement";
@@ -22,40 +24,40 @@
         public const string AddLinkName = "addlink";
         public const string RemoveLinkName = "removelink";
 
-        private readonly IIoTCore _ioTCore;
+        
 
-        public string Name { get; } = ProfileName;
+        public string Name => ProfileName;
 
-        public IoTCoreManagementProfileBuilder(IIoTCore iotCore)
+        public IoTCoreManagementProfileBuilder(ProfileBuilderConfiguration config) :base(config)
         {
-            _ioTCore = iotCore;
         }
 
-        public void Build()
+        public override void Build()
         {
-            var structureElement = _ioTCore.CreateStructureElement(_ioTCore.Root, ProfileName, profiles: new List<string> {ProfileName});
+            var structureElement = IoTCore.Root.AddChild(new StructureElement(ProfileName, profiles: new List<string> {ProfileName}));
 
-            _ioTCore.CreateSetterServiceElement<AddElementRequestServiceData>(structureElement, AddElementName, AddElementFunc);
-            _ioTCore.CreateSetterServiceElement<RemoveElementRequestServiceData>(structureElement, RemoveElementName, RemoveElementFunc);
-            _ioTCore.CreateServiceElement<AddProfileRequestServiceData, AddProfileResponseServiceData>(structureElement, AddProfileName, AddProfileFunc);
-            _ioTCore.CreateServiceElement<RemoveProfileRequestServiceData, RemoveProfileResponseServiceData>(structureElement, RemoveProfileName, RemoveProfileFunc);
-            _ioTCore.CreateSetterServiceElement<AddLinkRequestServiceData>(structureElement, AddLinkName, AddLinkFunc);
-            _ioTCore.CreateSetterServiceElement<RemoveLinkRequestServiceData>(structureElement, RemoveLinkName, RemoveLinkFunc);
+            structureElement.AddChild(new SetterServiceElement(AddElementName, AddElementFunc));
+            structureElement.AddChild(new SetterServiceElement(RemoveElementName, RemoveElementFunc));
+            structureElement.AddChild(new ServiceElement(AddProfileName, AddProfileFunc));
+            structureElement.AddChild(new ServiceElement(RemoveProfileName, RemoveProfileFunc));
+            structureElement.AddChild(new SetterServiceElement(AddLinkName, AddLinkFunc));
+            structureElement.AddChild(new SetterServiceElement(RemoveLinkName, RemoveLinkFunc));
         }
 
-        private void AddElementFunc(IBaseElement element, AddElementRequestServiceData data, int? cid = null)
+        private void AddElementFunc(IBaseElement element, Variant data, int? cid = null)
         {
-            AddElement(data);
+            var addElementRequestServiceData = Variant.ToObject<AddElementRequestServiceData>(data);
+            AddElement(addElementRequestServiceData);
         }
 
         public void AddElement(AddElementRequestServiceData data)
         {
             if (data == null)
             {
-                throw new ServiceException(ResponseCodes.DataInvalid, string.Format(Resource1.ServiceDataEmpty, AddElementName));
+                throw new IoTCoreException(ResponseCodes.DataInvalid, string.Format(Resource1.ServiceDataEmpty, AddElementName));
             }
             
-            var parentElement = _ioTCore.GetElementByAddress(data.Address);
+            var parentElement = IoTCore.GetElementByAddress(data.Address);
             
             if (parentElement == null)
             {
@@ -65,78 +67,76 @@
             switch (data.Type)
             {
                 case Identifiers.Data:
-                    var dataElement = _ioTCore.CreateDataElement<JToken>(parentElement, 
-                        data.Identifier, 
-                        null, 
-                        null, 
-                        true, 
-                        true,
+                    parentElement.AddChild(new DataElement<Variant>(data.Identifier,
+                        null,
+                        null,
+                        data.AddDataChanged,
                         null,
                         TimeSpan.FromMilliseconds(100),
                         data.Format,
                         data.Profiles,
-                        data.UId);
-                    if (data.AddDataChanged)
-                    {
-                        dataElement.DataChangedEventElement = _ioTCore.CreateEventElement(dataElement, Identifiers.DataChanged);
-                    }
-
+                        data.UId), true);
                     break;
 
                 case Identifiers.Structure:
-                    _ioTCore.CreateStructureElement(parentElement, data.Identifier, data.Format, data.Profiles, data.UId);
+                    parentElement.AddChild(new StructureElement(data.Identifier, data.Format, data.Profiles, data.UId), true);
                     break;
 
                 case Identifiers.Event:
-                    var eventElement = _ioTCore.CreateEventElement(parentElement, data.Identifier, null, null, data.Format, data.Profiles, data.UId);
-                    _ioTCore.CreateActionServiceElement(eventElement, Identifiers.TriggerEvent, (e, cid) =>
+                    var eventElement = (IEventElement)parentElement.AddChild(new EventElement(data.Identifier, data.Format, data.Profiles, data.UId));
+                    eventElement.AddChild(new ActionServiceElement(Identifiers.TriggerEvent , (e, cid) =>
                     {
                         eventElement.RaiseEvent();
-                    });
+                    }), true);
                     break;
                 default:
-                    throw new ServiceException(ResponseCodes.BadRequest, string.Format(Resource1.InvalidArgument, data.Type));
+                    throw new IoTCoreException(ResponseCodes.BadRequest, string.Format(Resource1.InvalidArgument, data.Type));
             }
         }
 
-        private void RemoveElementFunc(IBaseElement element, RemoveElementRequestServiceData data, int? cid = null)
+        private void RemoveElementFunc(IBaseElement element, Variant data, int? cid = null)
         {
-            if (data?.Address == Identifiers.Root)
+            var removeElementRequestServiceData = Variant.ToObject<RemoveElementRequestServiceData>(data);
+
+            if (removeElementRequestServiceData?.Address == Identifiers.Root)
             {
-                throw new ServiceException(ResponseCodes.BadRequest, string.Format(Resource1.InvalidArgument, data.Address));
+                throw new IoTCoreException(ResponseCodes.BadRequest, string.Format(Resource1.InvalidArgument, removeElementRequestServiceData.Address));
             }
-            RemoveElement(data);
+
+            RemoveElement(removeElementRequestServiceData);
         }
 
         public void RemoveElement(RemoveElementRequestServiceData data)
         {
             if (data == null)
             {
-                throw new ServiceException(ResponseCodes.DataInvalid, string.Format(Resource1.ServiceDataEmpty, RemoveElementName));
+                throw new IoTCoreException(ResponseCodes.DataInvalid, string.Format(Resource1.ServiceDataEmpty, RemoveElementName));
             }
 
-            var element = _ioTCore.Root.GetElementByAddress(data.Address);
+            var element = IoTCore.Root.GetElementByAddress(data.Address);
             if (element == null)
             {
-                throw new ServiceException(ResponseCodes.NotFound, string.Format(Resource1.ElementNotFound, data.Address));
+                throw new IoTCoreException(ResponseCodes.NotFound, string.Format(Resource1.ElementNotFound, data.Address));
             }
-            _ioTCore.RemoveElement(element.Parent, element);
+            element.Parent.RemoveChild(element, true);
         }
 
 
-        private AddProfileResponseServiceData AddProfileFunc(IBaseElement element, AddProfileRequestServiceData data, int? cid = null)
+        private Variant AddProfileFunc(IBaseElement element, Variant data, int? cid = null)
         {
             if (data == null)
             {
-                throw new ServiceException(ResponseCodes.DataInvalid, string.Format(Resource1.ServiceDataEmpty, AddProfileName));
+                throw new IoTCoreException(ResponseCodes.DataInvalid, string.Format(Resource1.ServiceDataEmpty, AddProfileName));
             }
 
-            if (data.Addresses == null || data.Addresses.Count == 0)
+            var addProfileRequestServiceData = Variant.ToObject<AddProfileRequestServiceData>(data);
+
+            if (addProfileRequestServiceData.Addresses == null || addProfileRequestServiceData.Addresses.Count == 0)
             {
-                throw new ServiceException(ResponseCodes.DataInvalid, Resource1.AddressListIsEmpty);
+                throw new IoTCoreException(ResponseCodes.DataInvalid, Resource1.AddressListIsEmpty);
             }
 
-            return AddProfile(data);
+            return Variant.FromObject(AddProfile(addProfileRequestServiceData));
         }
 
         public AddProfileResponseServiceData AddProfile(AddProfileRequestServiceData data)
@@ -145,7 +145,7 @@
 
             foreach (var address in data.Addresses)
             {
-                var element = _ioTCore.Root.GetElementByAddress(address);
+                var element = IoTCore.Root.GetElementByAddress(address);
 
                 if (!result.TryGetValue(address, out var list))
                 {
@@ -177,9 +177,12 @@
             return result;
         }
 
-        private RemoveProfileResponseServiceData RemoveProfileFunc(IBaseElement element, RemoveProfileRequestServiceData data, int? cid = null)
+        private Variant RemoveProfileFunc(IBaseElement element, Variant data, int? cid = null)
         {
-            return RemoveProfile(data);
+            RemoveProfileRequestServiceData removeProfileRequestServiceData = Variant.ToObject<RemoveProfileRequestServiceData>(data);
+            var result = RemoveProfile(removeProfileRequestServiceData);
+
+            return Variant.FromObject(result);
         }
 
         public RemoveProfileResponseServiceData RemoveProfile(RemoveProfileRequestServiceData data)
@@ -188,7 +191,7 @@
 
             if (data == null)
             {
-                throw new ServiceException(ResponseCodes.DataInvalid, string.Format(Resource1.ServiceDataEmpty, RemoveProfileName));
+                throw new IoTCoreException(ResponseCodes.DataInvalid, string.Format(Resource1.ServiceDataEmpty, RemoveProfileName));
             }
 
             foreach (var address in data.Addresses)
@@ -199,7 +202,7 @@
                     result.Add(address, list);
                 }
 
-                var element = _ioTCore.Root.GetElementByAddress(address);
+                var element = IoTCore.Root.GetElementByAddress(address);
 
                 if (element == null)
                 {
@@ -225,57 +228,58 @@
             return result;
         }
 
-        private void AddLinkFunc(IBaseElement element, AddLinkRequestServiceData data, int? cid = null)
+        private void AddLinkFunc(IBaseElement element, Variant data, int? cid = null)
         {
-            AddLink(data);
+            AddLink(Variant.ToObject<AddLinkRequestServiceData>(data));
         }
 
         public void AddLink(AddLinkRequestServiceData data)
         {
             if (data == null)
             {
-                throw new ServiceException(ResponseCodes.DataInvalid, string.Format(Resource1.ServiceDataEmpty, AddLinkName));
+                throw new IoTCoreException(ResponseCodes.DataInvalid, string.Format(Resource1.ServiceDataEmpty, AddLinkName));
             }
 
-            var sourceElement = _ioTCore.GetElementByAddress(data.SourceAddress);
+            var sourceElement = IoTCore.GetElementByAddress(data.SourceAddress);
             if (sourceElement == null)
             {
-                throw new ServiceException(ResponseCodes.NotFound, string.Format(Resource1.ElementNotFound, data.SourceAddress));
+                throw new IoTCoreException(ResponseCodes.NotFound, string.Format(Resource1.ElementNotFound, data.SourceAddress));
             }
 
-            var targetElement = _ioTCore.GetElementByAddress(data.TargetAddress);
+            var targetElement = IoTCore.GetElementByAddress(data.TargetAddress);
             if (targetElement == null)
             {
-                throw new ServiceException(ResponseCodes.NotFound, string.Format(Resource1.ElementNotFound, data.TargetAddress));
+                throw new IoTCoreException(ResponseCodes.NotFound, string.Format(Resource1.ElementNotFound, data.TargetAddress));
             }
-            _ioTCore.AddLink(sourceElement, targetElement, data.Identifier);
+
+            sourceElement.AddLink(targetElement, data.Identifier, true);
         }
 
-        private void RemoveLinkFunc(IBaseElement element, RemoveLinkRequestServiceData data, int? cid = null)
+        private void RemoveLinkFunc(IBaseElement element, Variant data, int? cid = null)
         {
-            RemoveLink(data);
+            RemoveLink(Variant.ToObject<RemoveLinkRequestServiceData>(data));
         }
 
         public void RemoveLink(RemoveLinkRequestServiceData data)
         {
             if (data == null)
             {
-                throw new ServiceException(ResponseCodes.DataInvalid, string.Format(Resource1.ServiceDataEmpty, RemoveLinkName));
+                throw new IoTCoreException(ResponseCodes.DataInvalid, string.Format(Resource1.ServiceDataEmpty, RemoveLinkName));
             }
 
-            var sourceElement = _ioTCore.GetElementByAddress(data.SourceAddress);
+            var sourceElement = IoTCore.GetElementByAddress(data.SourceAddress);
             if (sourceElement == null)
             {
-                throw new ServiceException(ResponseCodes.NotFound, string.Format(Resource1.ElementNotFound, data.SourceAddress));
+                throw new IoTCoreException(ResponseCodes.NotFound, string.Format(Resource1.ElementNotFound, data.SourceAddress));
             }
 
-            var targetElement = _ioTCore.GetElementByAddress(data.TargetAddress);
+            var targetElement = IoTCore.GetElementByAddress(data.TargetAddress);
             if (targetElement == null)
             {
-                throw new ServiceException(ResponseCodes.NotFound, string.Format(Resource1.ElementNotFound, data.TargetAddress));
+                throw new IoTCoreException(ResponseCodes.NotFound, string.Format(Resource1.ElementNotFound, data.TargetAddress));
             }
 
-            _ioTCore.RemoveLink(sourceElement, targetElement);
+            sourceElement.RemoveLink(targetElement, true);
         }
     }
 }

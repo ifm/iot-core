@@ -1,3 +1,9 @@
+
+using ifmIoTCore.Common.Variant;
+using ifmIoTCore.Elements;
+using ifmIoTCore.Elements.ServiceData.Responses;
+using Newtonsoft.Json;
+
 namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
 {
     using System;
@@ -7,9 +13,9 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
     using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
-    using Converter.Json;
     using Elements.ServiceData.Requests;
     using log4net;
+    using Logger;
     using Messages;
     using MQTTnet;
     using MQTTnet.Adapter;
@@ -60,10 +66,10 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
         [SetUp]
         public void PerTestSetup()
         {
-            this._iotCore = IoTCoreFactory.Create("id0", new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Warning));
-            this._mqttServerNetAdapter = new MqttServerNetAdapter(this._iotCore, this._iotCore.Root, new JsonConverter(), new IPEndPoint(IPAddress.Loopback, LocalBrokerPort), null, "testtopic");
-            this._mqttServerNetAdapter.RequestMessageReceived += MqttServerNetAdapterOnRequestReceived;
-            this._mqttServerNetAdapter.EventMessageReceived += MqttServerNetAdapterOnEventReceived;
+            this._iotCore = IoTCoreFactory.Create("id0", null, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Warning));
+            this._mqttServerNetAdapter = new MqttServerNetAdapter(this._iotCore, this._iotCore.Root, new MessageConverter.Json.Newtonsoft.MessageConverter(), new IPEndPoint(IPAddress.Loopback, LocalBrokerPort), null, "testtopic");
+            this._mqttServerNetAdapter.RequestReceived += MqttServerNetAdapterOnRequestReceived;
+            this._mqttServerNetAdapter.EventReceived += MqttServerNetAdapterOnEventReceived;
             this._iotCore.RegisterServerNetAdapter(this._mqttServerNetAdapter);
         }
 
@@ -71,10 +77,10 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
         public void PerTestTearDown()
         {
             this._iotCore.RemoveServerNetAdapter(this._mqttServerNetAdapter);
-            this._mqttServerNetAdapter.RequestMessageReceived -= MqttServerNetAdapterOnRequestReceived;
-            this._mqttServerNetAdapter.EventMessageReceived -= MqttServerNetAdapterOnEventReceived;
-            this._mqttServerNetAdapter.Stop();
-            this._mqttServerNetAdapter.Dispose();
+            this._mqttServerNetAdapter.RequestReceived -= MqttServerNetAdapterOnRequestReceived;
+            this._mqttServerNetAdapter.EventReceived -= MqttServerNetAdapterOnEventReceived;
+            //this._mqttServerNetAdapter.Stop();
+            //this._mqttServerNetAdapter.Dispose();
 
             this._iotCore.Dispose();
             this._iotCore = null;
@@ -108,7 +114,7 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
 
             var clientHasSubscribedToTopic = false;
 
-            this._mqttBroker.ClientSubscribedTopicHandler = new MqttServerClientSubscribedHandlerDelegate(args =>
+            this._mqttBroker.ClientSubscribedTopicHandler = new MqttServerClientSubscribedTopicHandlerDelegate(args =>
             {
                 if (args.TopicFilter.Topic == targetTopic)
                 {
@@ -154,50 +160,94 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
 
             var gettreeResponse = this._iotCore.HandleRequest(0, "/gettree").Data;
 
+            var g = Variant.ToObject<GetTreeResponseServiceData>(gettreeResponse);
+
             var mqttConnectionBaseAddress = $"/connections/{mqttConnectionItem.Identifier}";
 
-            string[] jpathqueriesAdrTypeProfile = {
-                "$..[?(@.adr == '/connections' && @.type == 'structure' && @.profiles[0] == 'connections')]",
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress}' && @.type == 'structure' && @.profiles[0] == 'commInterface')]",
+            var checks = new Func<GetTreeResponseServiceData, bool>[]
+            {
+                gr => gr.Subs.SingleOrDefault(x => x.Identifier == "connections" && x.Profiles.Contains("connections")) != null,
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier && x.Type == Identifiers.Structure && x.Profiles.Contains("commInterface")) != null,
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "status" && x.Type == Identifiers.Data && x.Profiles.Contains("runcontrol")) != null,
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "status")?.Subs?.SingleOrDefault(x=>x.Identifier == "start" && x.Type == Identifiers.Service) != null,
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "status")?.Subs?.SingleOrDefault(x=>x.Identifier == "stop" && x.Type == Identifiers.Service) != null,
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "status")?.Subs?.SingleOrDefault(x=>x.Identifier == "reset" && x.Type == Identifiers.Service) != null,
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "status")?.Subs?.SingleOrDefault(x=>x.Identifier == "suspend" && x.Type == Identifiers.Service) != null,
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "status")?.Subs?.SingleOrDefault(x=>x.Identifier == "getdata" && x.Type == Identifiers.Service) != null,
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "status")?.Subs?.SingleOrDefault(x=>x.Identifier == "datachanged" && x.Type == Identifiers.Event) != null,
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "status")?.Subs?.SingleOrDefault(x=>x.Identifier == "datachanged")?.Subs?.SingleOrDefault(x=>x.Identifier == Identifiers.Subscribe && x.Type == Identifiers.Service) != null,
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "status")?.Subs?.SingleOrDefault(x=>x.Identifier == "datachanged")?.Subs?.SingleOrDefault(x=>x.Identifier == Identifiers.Unsubscribe && x.Type == Identifiers.Service) != null,
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "type" && x.Type == Identifiers.Data) != null,
 
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/status"}' && @.type == 'data' && @.profiles[0] == 'runcontrol')]",
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/status/start"}' && @.type == 'service')]",
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/status/stop"}' && @.type == 'service')]",
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/status/reset"}' && @.type == 'service')]",
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/status/suspend"}' && @.type == 'service')]",
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/status/getdata"}' && @.type == 'service')]",
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/status/datachanged"}' && @.type == 'event')]",
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/status/datachanged/subscribe"}' && @.type == 'service')]",
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/status/datachanged/unsubscribe"}' && @.type == 'service')]",
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "mqttsetup" && x.Type == Identifiers.Structure && x.Profiles.Contains("mqttsetup")) != null,
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "mqttsetup")?.Subs.SingleOrDefault(x=>x.Identifier == "QoS" && x.Type == Identifiers.Data && x.Profiles.Contains("parameter")) != null,
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "mqttsetup")?.Subs.SingleOrDefault(x=>x.Identifier == "version" && x.Type == Identifiers.Data) != null,
 
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/type"}' && @.type == 'data')]",
-
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttsetup"}' && @.type == 'structure' && @.profiles[0] == 'mqttsetup')]",
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttsetup/QoS"}' && @.type == 'data' && @.profiles[0] == 'parameter')]",
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttsetup/version"}' && @.type == 'data')]",
-
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel"}' && @.type == 'structure' && @.profiles[0] == 'commchannel')]",
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel/status"}' && @.type == 'data' && @.profiles[0] == 'runcontrol')]",
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel/status/start"}' && @.type == 'service')]",
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel/status/stop"}' && @.type == 'service')]",
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel/status/reset"}' && @.type == 'service')]",
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel/status/preset"}' && @.type == 'data')]",
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel/status/getdata"}' && @.type == 'service')]",
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel/type"}' && @.type == 'data')]",
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel/mqttCmdChannelSetup"}' && @.type == 'structure' && @.profiles[0] == 'mqttcmdchannelsetup')]",
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel/mqttCmdChannelSetup/brokerIP"}' && @.type == 'data' && @.profiles[0] == 'parameter')]",
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel/mqttCmdChannelSetup/brokerPort"}' && @.type == 'data' && @.profiles[0] == 'parameter')]",
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel/mqttCmdChannelSetup/cmdTopic"}' && @.type == 'data' && @.profiles[0] == 'parameter')]",
-                $"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel/mqttCmdChannelSetup/defaultReplyTopic"}' && @.type == 'data' && @.profiles[0] == 'parameter')]",
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "mqttcmdchannel" && x.Type == Identifiers.Structure && x.Profiles.Contains("commchannel")) != null,
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "mqttcmdchannel")?.Subs?.SingleOrDefault(x=>x.Identifier == "status" && x.Type == Identifiers.Data &&x.Profiles.Contains("runcontrol")) != null,
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "mqttcmdchannel")?.Subs?.SingleOrDefault(x=>x.Identifier == "status")?.Subs?.SingleOrDefault(x=>x.Identifier == "start" && x.Type == Identifiers.Service) != null,
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "mqttcmdchannel")?.Subs?.SingleOrDefault(x=>x.Identifier == "status")?.Subs?.SingleOrDefault(x=>x.Identifier == "start" && x.Type == Identifiers.Service) != null,
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "mqttcmdchannel")?.Subs?.SingleOrDefault(x=>x.Identifier == "status")?.Subs?.SingleOrDefault(x=>x.Identifier == "start" && x.Type == Identifiers.Service) != null,
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "mqttcmdchannel")?.Subs?.SingleOrDefault(x=>x.Identifier == "status")?.Subs?.SingleOrDefault(x=>x.Identifier == "preset" && x.Type == Identifiers.Data) != null,
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "mqttcmdchannel")?.Subs?.SingleOrDefault(x=>x.Identifier == "status")?.Subs?.SingleOrDefault(x=>x.Identifier == "getdata" && x.Type == Identifiers.Service) != null,
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "mqttcmdchannel")?.Subs?.SingleOrDefault(x=>x.Identifier == "type" && x.Type == Identifiers.Data) != null,
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "mqttcmdchannel")?.Subs?.SingleOrDefault(x=>x.Identifier == "mqttCmdChannelSetup" && x.Type == Identifiers.Structure && x.Profiles.Contains("mqttcmdchannelsetup")) != null,
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "mqttcmdchannel")?.Subs?.SingleOrDefault(x=>x.Identifier == "mqttCmdChannelSetup" && x.Type == Identifiers.Structure && x.Profiles.Contains("mqttcmdchannelsetup"))?.Subs?.SingleOrDefault(x=>x.Identifier == "brokerIP" && x.Type == Identifiers.Data && x.Profiles.Contains("parameter")) != null,
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "mqttcmdchannel")?.Subs?.SingleOrDefault(x=>x.Identifier == "mqttCmdChannelSetup" && x.Type == Identifiers.Structure && x.Profiles.Contains("mqttcmdchannelsetup"))?.Subs?.SingleOrDefault(x=>x.Identifier == "brokerPort" && x.Type == Identifiers.Data && x.Profiles.Contains("parameter")) != null,
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "mqttcmdchannel")?.Subs?.SingleOrDefault(x=>x.Identifier == "mqttCmdChannelSetup" && x.Type == Identifiers.Structure && x.Profiles.Contains("mqttcmdchannelsetup"))?.Subs?.SingleOrDefault(x=>x.Identifier == "cmdTopic" && x.Type == Identifiers.Data && x.Profiles.Contains("parameter")) != null,
+                gr => gr.Subs?.SingleOrDefault(x=>x.Identifier == "connections")?.Subs?.SingleOrDefault(x=>x.Identifier == mqttConnectionItem.Identifier)?.Subs?.SingleOrDefault(x=>x.Identifier == "mqttcmdchannel")?.Subs?.SingleOrDefault(x=>x.Identifier == "mqttCmdChannelSetup" && x.Type == Identifiers.Structure && x.Profiles.Contains("mqttcmdchannelsetup"))?.Subs?.SingleOrDefault(x=>x.Identifier == "defaultReplyTopic" && x.Type == Identifiers.Data && x.Profiles.Contains("parameter")) != null,
             };
+
+            string[] jpathqueriesAdrTypeProfile = {
+                //"$..[?(@.adr == '/connections' && @.type == 'structure' && @.profiles[0] == 'connections')]",
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress}' && @.type == 'structure' && @.profiles[0] == 'commInterface')]",
+
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/status"}' && @.type == 'data' && @.profiles[0] == 'runcontrol')]",
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/status/start"}' && @.type == 'service')]",
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/status/stop"}' && @.type == 'service')]",
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/status/reset"}' && @.type == 'service')]",
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/status/suspend"}' && @.type == 'service')]",
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/status/getdata"}' && @.type == 'service')]",
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/status/datachanged"}' && @.type == 'event')]",
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/status/datachanged/subscribe"}' && @.type == 'service')]",
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/status/datachanged/unsubscribe"}' && @.type == 'service')]",
+
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/type"}' && @.type == 'data')]",
+
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttsetup"}' && @.type == 'structure' && @.profiles[0] == 'mqttsetup')]",
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttsetup/QoS"}' && @.type == 'data' && @.profiles[0] == 'parameter')]",
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttsetup/version"}' && @.type == 'data')]",
+
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel"}' && @.type == 'structure' && @.profiles[0] == 'commchannel')]",
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel/status"}' && @.type == 'data' && @.profiles[0] == 'runcontrol')]",
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel/status/start"}' && @.type == 'service')]",
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel/status/stop"}' && @.type == 'service')]",
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel/status/reset"}' && @.type == 'service')]",
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel/status/preset"}' && @.type == 'data')]",
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel/status/getdata"}' && @.type == 'service')]",
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel/type"}' && @.type == 'data')]",
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel/mqttCmdChannelSetup"}' && @.type == 'structure' && @.profiles[0] == 'mqttcmdchannelsetup')]",
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel/mqttCmdChannelSetup/brokerIP"}' && @.type == 'data' && @.profiles[0] == 'parameter')]",
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel/mqttCmdChannelSetup/brokerPort"}' && @.type == 'data' && @.profiles[0] == 'parameter')]",
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel/mqttCmdChannelSetup/cmdTopic"}' && @.type == 'data' && @.profiles[0] == 'parameter')]",
+                //$"$..[?(@.adr == '{mqttConnectionBaseAddress + "/mqttcmdchannel/mqttCmdChannelSetup/defaultReplyTopic"}' && @.type == 'data' && @.profiles[0] == 'parameter')]",
+            };
+
+
+            Assert.Multiple(() =>
+            {
+
+                foreach (var item in checks)
+                {
+                    Assert.True(item(g));
+                }
+            });
 
             Assert.Multiple(() =>
             {
                 foreach (var queryAtp in jpathqueriesAdrTypeProfile)
                 {
-                    Assert.NotNull(
-                        gettreeResponse.SelectToken(queryAtp),
-                        $"Failed to find element with query: {queryAtp}");
+                    //Assert.NotNull(gettreeResponse.SelectToken(queryAtp), $"Failed to find element with query: {queryAtp}");
                 }
             });
 
@@ -210,22 +260,22 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
         { // integration test not a system test
             // Given: 1 iot core, mqtt netadapter initialised and connected with mqtt broker (over local address port 1883)
             var uniqueIotId = Guid.NewGuid().ToString();
-            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Warning));
-            using var mqttServerNetAdapter1 = new MqttServerNetAdapter(iotCore1, iotCore1.Root, new JsonConverter(), new IPEndPoint(IPAddress.Loopback, LocalBrokerPort), null, "cmdTopic");
+            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, null, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Warning));
+            using var mqttServerNetAdapter1 = new MqttServerNetAdapter(iotCore1, iotCore1.Root, new MessageConverter.Json.Newtonsoft.MessageConverter(), new IPEndPoint(IPAddress.Loopback, LocalBrokerPort), null, "cmdTopic");
 
             void HandleRequest(object sender, RequestMessageEventArgs args)
             {
-                args.Response = iotCore1.HandleRequest(args.Request);
+                args.ResponseMessage = iotCore1.HandleRequest(args.RequestMessage);
             }
 
-            mqttServerNetAdapter1.RequestMessageReceived += HandleRequest;
+            mqttServerNetAdapter1.RequestReceived += HandleRequest;
 
             void HandleEvent(object sender, EventMessageEventArgs args)
             {
                 iotCore1.HandleEvent(args.EventMessage);
             }
 
-            mqttServerNetAdapter1.EventMessageReceived += HandleEvent;
+            mqttServerNetAdapter1.EventReceived += HandleEvent;
 
             iotCore1.RegisterServerNetAdapter(mqttServerNetAdapter1);
             mqttServerNetAdapter1.Start();
@@ -241,7 +291,7 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                 Assert.That(result.ResultCode, Is.EqualTo(MqttClientConnectResultCode.Success));
                 iotCore1.RequestMessageReceived += (sender, eventargs) =>
                 {
-                    msgIn = eventargs.Request;
+                    msgIn = eventargs.RequestMessage;
                     // ReSharper disable once AccessToDisposedClosure
                     msgSentOnMqtt.Set();
                 };
@@ -255,8 +305,8 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
             }
             finally
             { // don't forget to close shared resources for other tests to reuse
-                mqttServerNetAdapter1.RequestMessageReceived -= HandleRequest;
-                mqttServerNetAdapter1.EventMessageReceived -= HandleEvent;
+                mqttServerNetAdapter1.RequestReceived -= HandleRequest;
+                mqttServerNetAdapter1.EventReceived -= HandleEvent;
                 mqttServerNetAdapter1.Stop();
                 mqttServerNetAdapter1.Dispose();
                 msgSentOnMqtt.Dispose();
@@ -273,23 +323,23 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
         { // system test
             // Given: 1 iot core, mqtt netadapter initialised and connected with mqtt broker (over local address port localBrokerPort )
             var uniqueIotId = Guid.NewGuid().ToString();
-            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Warning));
-            var msgConverter = new JsonConverter();
+            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, null, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Warning));
+            var msgConverter = new MessageConverter.Json.Newtonsoft.MessageConverter();
             using var mqttServerNetAdapter1 = new MqttServerNetAdapter(iotCore1, iotCore1.Root, msgConverter, new IPEndPoint(IPAddress.Loopback, LocalBrokerPort), null, "cmdTopic");
 
             void HandleRequest(object sender, RequestMessageEventArgs args)
             {
-                args.Response = iotCore1.HandleRequest(args.Request);
+                args.ResponseMessage = iotCore1.HandleRequest(args.RequestMessage);
             }
 
-            mqttServerNetAdapter1.RequestMessageReceived += HandleRequest;
+            mqttServerNetAdapter1.RequestReceived += HandleRequest;
 
             void HandleEvent(object sender, EventMessageEventArgs args)
             {
                 iotCore1.HandleEvent(args.EventMessage);
             }
 
-            mqttServerNetAdapter1.EventMessageReceived += HandleEvent;
+            mqttServerNetAdapter1.EventReceived += HandleEvent;
 
             iotCore1.RegisterServerNetAdapter(mqttServerNetAdapter1);
             mqttServerNetAdapter1.Start();
@@ -308,10 +358,10 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
             {
                 var subscribeResult2 = defaultReplyTopicClient.SubscribeAsync("replyTopic").GetAwaiter().GetResult();
                 Assert.AreEqual(MqttClientSubscribeResultCode.GrantedQoS0, subscribeResult2.Items[0].ResultCode);
-                defaultReplyTopicClient.ApplicationMessageReceivedHandler = new MqttApplicationMessageReceivedHandlerDelegate((mqtteventargs) =>
+                defaultReplyTopicClient.ApplicationMessageReceivedHandler = new MqttApplicationMessageReceivedHandlerDelegate(mqtteventargs =>
                 {
                     iotResponseString = Encoding.UTF8.GetString(mqtteventargs.ApplicationMessage.Payload);
-                    if (iotResponseString.Contains(randomCid.ToString()) && iotResponseString.Contains("data"))
+                    if (iotResponseString.Contains(randomCid.ToString()) && iotResponseString.Contains("profileData"))
                     {
                         // ReSharper disable once AccessToDisposedClosure
                         msgSentOnMqtt.Set();
@@ -331,8 +381,8 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
             { // don't forget to close shared resources for other tests to reuse
                 defaultReplyTopicClient.DisconnectAsync().Wait();
                 cmdTopicClient.DisconnectAsync().Wait();
-                mqttServerNetAdapter1.RequestMessageReceived -= HandleRequest;
-                mqttServerNetAdapter1.EventMessageReceived -= HandleEvent;
+                mqttServerNetAdapter1.RequestReceived -= HandleRequest;
+                mqttServerNetAdapter1.EventReceived -= HandleEvent;
                 mqttServerNetAdapter1.Stop();
                 mqttServerNetAdapter1.Dispose();
                 msgSentOnMqtt.Dispose();
@@ -340,7 +390,7 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
 
             // Then: iot core publishes iot response to mqtt broker, defaultReplyTopic, received by subscriber
             Assert.IsNotNull(iotResponseString);
-            var iotResponseMessage = msgConverter.Deserialize<Message>(iotResponseString);
+            var iotResponseMessage = msgConverter.Deserialize(iotResponseString);
             Assert.That(iotResponseString, Contains.Substring(uniqueIotId));
             Assert.AreEqual(randomCid, iotResponseMessage.Cid);
             Assert.AreEqual("/getidentity", iotResponseMessage.Address);
@@ -352,10 +402,11 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
             // Given: 1 iot core (1 event element), mqtt netadapter initialised, local mqtt broker available for communication 
             var uniqueIotId = Guid.NewGuid().ToString();
             var randomCid = new Random().Next();
-            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Warning));
-            var msgConverter = new JsonConverter();
+            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, null, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Warning));
+            var msgConverter = new MessageConverter.Json.Newtonsoft.MessageConverter();
             iotCore1.RegisterClientNetAdapterFactory(new MqttNetAdapterClientFactory(msgConverter));
-            var myevent = iotCore1.CreateEventElement(iotCore1.Root, identifier: "myevent");
+            var myevent = new EventElement(identifier: "myevent");
+            iotCore1.Root.AddChild(myevent);
             string eventTopic = $"testEvent{randomCid}";
 
             var subscribeMessage = JObject.Parse(@" {
@@ -367,12 +418,35 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                                 'datatosend': ['/getidentity'], 
                                 'duration': 'uptime', 'uid': 'unique_id_here'}
                             }");
-            subscribeMessage["cid"] = randomCid;
+
+            var subscribeMessageAsVariant = new VariantObject()
+            {
+                { "code", (VariantValue) 10 },
+                { "cid" , (VariantValue)randomCid },
+                { "adr" , (VariantValue)"/myevent/subscribe" },
+                { "data", new VariantObject
+                    {
+                        { "callback" , (VariantValue)$"mqtt://127.0.0.1:{LocalBrokerPort}/{eventTopic}" },
+                        { "datatosend", new VariantArray(new [] { new VariantValue("/getidentity") })},
+                        { "duration", (VariantValue) "uptime" },
+                        { "uid" , (VariantValue)uniqueIotId }
+
+                    }
+                }
+            };
+
+            var message = new Message(RequestCodes.Request, randomCid, "/myevent/subscribe", new VariantObject
+            {
+                {"callback", (VariantValue) $"mqtt://127.0.0.1:{LocalBrokerPort}/{eventTopic}"},
+                {"datatosend", new VariantArray(new[] {new VariantValue("/getidentity")})},
+                {"duration", (VariantValue) "uptime"},
+                {"uid", (VariantValue) uniqueIotId}
+
+            });
+
             // ReSharper disable once PossibleNullReferenceException
-            subscribeMessage["data"]["callback"] = $"mqtt://127.0.0.1:{LocalBrokerPort}/{eventTopic}";
-            subscribeMessage["data"]["uid"] = uniqueIotId;
             // subscribe to event with mqtt
-            var subscribeReq = iotCore1.HandleRequest(msgConverter.Deserialize<RequestMessage>(subscribeMessage.ToString()));
+            var subscribeReq = iotCore1.HandleRequest(message);
 
             string iotResponseString = null;
             var msgSentOnMqtt = new ManualResetEventSlim();
@@ -383,7 +457,7 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
             // When: iot request is sent to mqtt cmdTopic
             try
             {
-                brokerAppMessagesClient.ApplicationMessageReceivedHandler = new MqttApplicationMessageReceivedHandlerDelegate((mqtteventargs) =>
+                brokerAppMessagesClient.ApplicationMessageReceivedHandler = new MqttApplicationMessageReceivedHandlerDelegate(mqtteventargs =>
                {
                    iotResponseString = Encoding.UTF8.GetString(mqtteventargs.ApplicationMessage.Payload);
                    if (mqtteventargs.ApplicationMessage.Topic == eventTopic && iotResponseString.Contains(randomCid.ToString()))
@@ -404,7 +478,7 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
 
             // Then: iot core publishes iot response to mqtt broker, defaultReplyTopic, received by subscriber
             Assert.IsNotNull(iotResponseString);
-            var iotResponseMessage = msgConverter.Deserialize<Message>(iotResponseString);
+            var iotResponseMessage = msgConverter.Deserialize(iotResponseString);
             Assert.That(iotResponseString, Contains.Substring("/myevent"));
             Assert.AreEqual(randomCid, iotResponseMessage.Cid);
             Assert.AreEqual("/" + eventTopic, iotResponseMessage.Address);
@@ -419,23 +493,23 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
              * MqttServerNetAdapter started
              */
             var uniqueIotId = Guid.NewGuid().ToString();
-            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
-            var msgConverter = new JsonConverter();
+            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, null, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
+            var msgConverter = new MessageConverter.Json.Newtonsoft.MessageConverter();
             using var mqttServerNetAdapter1 = new MqttServerNetAdapter(iotCore1, iotCore1.Root, msgConverter, new IPEndPoint(IPAddress.Loopback, LocalBrokerPort), null, "cmdTopic");
 
             void HandleRequest(object sender, RequestMessageEventArgs args)
             {
-                args.Response = iotCore1.HandleRequest(args.Request);
+                args.ResponseMessage = iotCore1.HandleRequest(args.RequestMessage);
             }
 
-            mqttServerNetAdapter1.RequestMessageReceived += HandleRequest;
+            mqttServerNetAdapter1.RequestReceived += HandleRequest;
 
             void HandleEvent(object sender, EventMessageEventArgs args)
             {
                 iotCore1.HandleEvent(args.EventMessage);
             }
 
-            mqttServerNetAdapter1.EventMessageReceived += HandleEvent; 
+            mqttServerNetAdapter1.EventReceived += HandleEvent; 
 
             iotCore1.RegisterServerNetAdapter(mqttServerNetAdapter1);
             mqttServerNetAdapter1.Start();
@@ -444,23 +518,23 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
             string[] entryEventsDone = new string[4] { "", "", "", "" };
             try
             {
-                this._mqttBroker.ClientConnectedHandler = new MqttServerClientConnectedHandlerDelegate((mqtteventargs) =>
+                this._mqttBroker.ClientConnectedHandler = new MqttServerClientConnectedHandlerDelegate(mqtteventargs =>
                {
                    entryEventsDone[0] = (mqtteventargs.ClientId.ToString());
                    this.Logger.Debug($"mqttServer Client Connected  id: {entryEventsDone[0]}");
                });
-                this._mqttBroker.ClientSubscribedTopicHandler = new MqttServerClientSubscribedHandlerDelegate((mqtteventargs) =>
+                this._mqttBroker.ClientSubscribedTopicHandler = new MqttServerClientSubscribedTopicHandlerDelegate(mqtteventargs =>
                {
                    entryEventsDone[1] = (mqtteventargs.ClientId.ToString());
                    this.Logger.Debug($"mqttServer Client Subscribed  id: {entryEventsDone[1]}");
                });
-                this._mqttBroker.ClientUnsubscribedTopicHandler = new MqttServerClientUnsubscribedTopicHandlerDelegate((mqtteventargs) =>
+                this._mqttBroker.ClientUnsubscribedTopicHandler = new MqttServerClientUnsubscribedTopicHandlerDelegate(mqtteventargs =>
                {
                    entryEventsDone[2] = (mqtteventargs.ClientId.ToString());
                    this.Logger.Debug($"mqttServer Client Unsubscribed  id: {entryEventsDone[2]}");
                    serverUnsubscription.Set();
                });
-                this._mqttBroker.ClientDisconnectedHandler = new MqttServerClientDisconnectedHandlerDelegate((mqtteventargs) =>
+                this._mqttBroker.ClientDisconnectedHandler = new MqttServerClientDisconnectedHandlerDelegate(mqtteventargs =>
                {
                    entryEventsDone[3] = (mqtteventargs.ClientId.ToString());
                    this.Logger.Debug($"mqttServer Client Disconnected  id: {entryEventsDone[3]}");
@@ -497,8 +571,8 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                 this._mqttBroker.ClientSubscribedTopicHandler = null;
                 this._mqttBroker.ClientUnsubscribedTopicHandler = null;
                 this._mqttBroker.ClientDisconnectedHandler = null;
-                mqttServerNetAdapter1.RequestMessageReceived -= HandleRequest;
-                mqttServerNetAdapter1.EventMessageReceived -= HandleEvent;
+                mqttServerNetAdapter1.RequestReceived -= HandleRequest;
+                mqttServerNetAdapter1.EventReceived -= HandleEvent;
                 mqttServerNetAdapter1.Stop();
                 mqttServerNetAdapter1.Dispose();
 
@@ -516,23 +590,23 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
              * MqttServerNetAdapter in stopped state
              */
             var uniqueIotId = Guid.NewGuid().ToString();
-            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
-            var msgConverter = new JsonConverter();
+            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, null, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
+            var msgConverter = new MessageConverter.Json.Newtonsoft.MessageConverter();
             using var mqttServerNetAdapter1 = new MqttServerNetAdapter(iotCore1, iotCore1.Root, msgConverter, new IPEndPoint(IPAddress.Loopback, LocalBrokerPort), null, "cmdTopic");
 
             void HandleRequest(object sender, RequestMessageEventArgs args)
             {
-                args.Response = iotCore1.HandleRequest(args.Request);
+                args.ResponseMessage = iotCore1.HandleRequest(args.RequestMessage);
             }
 
-            mqttServerNetAdapter1.RequestMessageReceived += HandleRequest;
+            mqttServerNetAdapter1.RequestReceived += HandleRequest;
 
             void HandleEvent(object sender, EventMessageEventArgs args)
             {
                 iotCore1.HandleEvent(args.EventMessage);
             }
 
-            mqttServerNetAdapter1.EventMessageReceived += HandleEvent;
+            mqttServerNetAdapter1.EventReceived += HandleEvent;
 
             iotCore1.RegisterServerNetAdapter(mqttServerNetAdapter1);
             mqttServerNetAdapter1.Stop();
@@ -541,24 +615,24 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
             string[] exitEventsDone = new string[4] { "", "", "", "" };
             try
             {
-                this._mqttBroker.ClientConnectedHandler = new MqttServerClientConnectedHandlerDelegate((mqtteventargs) =>
+                this._mqttBroker.ClientConnectedHandler = new MqttServerClientConnectedHandlerDelegate(mqtteventargs =>
                {
                    exitEventsDone[0] = (mqtteventargs.ClientId.ToString());
                    this.Logger.Debug($"mqttServer Client Connected  id: {exitEventsDone[0]}");
                    serverConnection.Set();
                });
-                this._mqttBroker.ClientSubscribedTopicHandler = new MqttServerClientSubscribedHandlerDelegate((mqtteventargs) =>
+                this._mqttBroker.ClientSubscribedTopicHandler = new MqttServerClientSubscribedTopicHandlerDelegate(mqtteventargs =>
                {
                    exitEventsDone[1] = (mqtteventargs.ClientId.ToString());
                    this.Logger.Debug($"mqttServer Client Subscribed  id: {exitEventsDone[1]}");
                    serverSubscription.Set();
                });
-                this._mqttBroker.ClientUnsubscribedTopicHandler = new MqttServerClientUnsubscribedTopicHandlerDelegate((mqtteventargs) =>
+                this._mqttBroker.ClientUnsubscribedTopicHandler = new MqttServerClientUnsubscribedTopicHandlerDelegate(mqtteventargs =>
                {
                    exitEventsDone[2] = (mqtteventargs.ClientId.ToString());
                    this.Logger.Debug($"mqttServer Client Unsubscribed  id: {exitEventsDone[2]}");
                });
-                this._mqttBroker.ClientDisconnectedHandler = new MqttServerClientDisconnectedHandlerDelegate((mqtteventargs) =>
+                this._mqttBroker.ClientDisconnectedHandler = new MqttServerClientDisconnectedHandlerDelegate(mqtteventargs =>
                {
                    exitEventsDone[3] = (mqtteventargs.ClientId.ToString());
                    this.Logger.Debug($"mqttServer Client Disconnected  id: {exitEventsDone[3]}");
@@ -593,8 +667,8 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                 this._mqttBroker.ClientUnsubscribedTopicHandler = null;
                 this._mqttBroker.ClientDisconnectedHandler = null;
                 
-                mqttServerNetAdapter1.RequestMessageReceived -= HandleRequest;
-                mqttServerNetAdapter1.EventMessageReceived -= HandleEvent;
+                mqttServerNetAdapter1.RequestReceived -= HandleRequest;
+                mqttServerNetAdapter1.EventReceived -= HandleEvent;
                 mqttServerNetAdapter1.Stop();
                 mqttServerNetAdapter1.Dispose();
                 
@@ -630,24 +704,24 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
             var uniqueIotId = Guid.NewGuid().ToString();
             var uniquecmdTopic = uniqueIotId;
             var randomCid = new Random().Next();
-            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
+            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, null, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
             //var publicBroker = new IPEndPoint(System.Net.Dns.GetHostAddresses("broker.hivemq.com")[0], 1883); // proxy issues ?
-            var msgConverter = new JsonConverter();
+            var msgConverter = new MessageConverter.Json.Newtonsoft.MessageConverter();
             using var mqttServerNetAdapter1 = new MqttServerNetAdapter(iotCore1, iotCore1.Root, msgConverter, new IPEndPoint(IPAddress.Loopback, LocalBrokerPort), null, uniquecmdTopic);
 
             void HandleRequest(object sender, RequestMessageEventArgs args)
             {
-                args.Response = iotCore1.HandleRequest(args.Request);
+                args.ResponseMessage = iotCore1.HandleRequest(args.RequestMessage);
             }
 
-            mqttServerNetAdapter1.RequestMessageReceived += HandleRequest;
+            mqttServerNetAdapter1.RequestReceived += HandleRequest;
 
             void HandleEvent(object sender, EventMessageEventArgs args)
             {
                 iotCore1.HandleEvent(args.EventMessage);
             }
 
-            mqttServerNetAdapter1.EventMessageReceived += HandleEvent;
+            mqttServerNetAdapter1.EventReceived += HandleEvent;
 
             mqttServerNetAdapter1.Start();
             iotCore1.RegisterServerNetAdapter(mqttServerNetAdapter1);
@@ -663,9 +737,9 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
             {
                 iotCore1.RequestMessageReceived += (sender, eventargs) =>
                 {
-                    if (eventargs.Request.Cid == randomCid)
+                    if (eventargs.RequestMessage.Cid == randomCid)
                     {
-                        iotResponse = eventargs.Request;
+                        iotResponse = eventargs.RequestMessage;
                         msgSentOnMqtt.Set();
                     }
                 };
@@ -683,8 +757,8 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
             { // don't forget to close shared resources for other tests to reuse
                 brokerAppMessagesClient.DisconnectAsync().Wait();
                 msgSentOnMqtt.Dispose();
-                mqttServerNetAdapter1.RequestMessageReceived -= HandleRequest;
-                mqttServerNetAdapter1.EventMessageReceived -= HandleEvent;
+                mqttServerNetAdapter1.RequestReceived -= HandleRequest;
+                mqttServerNetAdapter1.EventReceived -= HandleEvent;
             }
             // Then: application message is recieved by iot core via mqtt netadapter
             Assert.AreEqual($"/{randomCid}", iotResponse.Address);
@@ -693,22 +767,22 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
         [Test, NonParallelizable]
         public void TestCmdTopicOnRestart()
         {
-            var iotCore = IoTCoreFactory.Create("id0", new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Warning));
-            using var mqttNetAdapter = new MqttServerNetAdapter(iotCore, iotCore.Root, new JsonConverter(), new IPEndPoint(IPAddress.Loopback, LocalBrokerPort), null, "myTopic");
+            var iotCore = IoTCoreFactory.Create("id0", null, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Warning));
+            using var mqttNetAdapter = new MqttServerNetAdapter(iotCore, iotCore.Root, new MessageConverter.Json.Newtonsoft.MessageConverter(), new IPEndPoint(IPAddress.Loopback, LocalBrokerPort), null, "myTopic");
 
             void HandleRequest(object sender, RequestMessageEventArgs args)
             {
-                args.Response = iotCore.HandleRequest(args.Request);
+                args.ResponseMessage = iotCore.HandleRequest(args.RequestMessage);
             }
 
-            mqttNetAdapter.RequestMessageReceived += HandleRequest;
+            mqttNetAdapter.RequestReceived += HandleRequest;
 
             void HandleEvent(object sender, EventMessageEventArgs args)
             {
                 iotCore.HandleEvent(args.EventMessage);
             }
 
-            mqttNetAdapter.EventMessageReceived += HandleEvent;
+            mqttNetAdapter.EventReceived += HandleEvent;
 
             iotCore.RegisterServerNetAdapter(mqttNetAdapter);
 
@@ -720,8 +794,8 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
 
             Assert.AreEqual(mqttNetAdapter.CommandTopic, "myTopic");
 
-            mqttNetAdapter.RequestMessageReceived -= HandleRequest;
-            mqttNetAdapter.EventMessageReceived -= HandleEvent;
+            mqttNetAdapter.RequestReceived -= HandleRequest;
+            mqttNetAdapter.EventReceived -= HandleEvent;
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T108"), NonParallelizable]
@@ -745,23 +819,23 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
 
             var uniqueIotId = Guid.NewGuid().ToString();
             var uniquecmdTopic = uniqueIotId;
-            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
-            var msgConverter = new JsonConverter();
+            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, null, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
+            var msgConverter = new MessageConverter.Json.Newtonsoft.MessageConverter();
             using var mqttServerNetAdapter1 = new MqttServerNetAdapter(iotCore1, iotCore1.Root, msgConverter, new IPEndPoint(IPAddress.Loopback, LocalBrokerPort), null, uniquecmdTopic);
 
             void HandleRequest(object sender, RequestMessageEventArgs args)
             {
-                args.Response = iotCore1.HandleRequest(args.Request);
+                args.ResponseMessage = iotCore1.HandleRequest(args.RequestMessage);
             }
 
-            mqttServerNetAdapter1.RequestMessageReceived += HandleRequest;
+            mqttServerNetAdapter1.RequestReceived += HandleRequest;
 
             void HandleEvent(object sender, EventMessageEventArgs args)
             {
                 iotCore1.HandleEvent(args.EventMessage);
             }
 
-            mqttServerNetAdapter1.EventMessageReceived += HandleEvent;
+            mqttServerNetAdapter1.EventReceived += HandleEvent;
             
             iotCore1.RegisterServerNetAdapter(mqttServerNetAdapter1);
             await mqttServerNetAdapter1.StartAsync();
@@ -775,37 +849,46 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                 var commInterfaceItem = iotCore1.Root.GetElementByProfile("commInterface");
                 // changing port for test setup requirements. this assumes brokerPort.setdata test passes
                 
-                mqttBroker2.ClientConnectedHandler = new MqttServerClientConnectedHandlerDelegate((mqtteventargs) =>
+                mqttBroker2.ClientConnectedHandler = new MqttServerClientConnectedHandlerDelegate(mqtteventargs =>
                {
                    entryEventsDone[0] = (mqtteventargs.ClientId.ToString());
                    serverConnection.Set();
                    this.Logger.Debug($"mqttServer Client Connected  id: {entryEventsDone[0]}");
                });
-                mqttBroker2.ClientSubscribedTopicHandler = new MqttServerClientSubscribedHandlerDelegate((mqtteventargs) =>
+                mqttBroker2.ClientSubscribedTopicHandler = new MqttServerClientSubscribedTopicHandlerDelegate(mqtteventargs =>
                {
                    entryEventsDone[1] = (mqtteventargs.ClientId.ToString());
                    serverSubscription.Set();
                    this.Logger.Debug($"mqttServer Client Subscribed  id: {entryEventsDone[1]}");
                });
-                this._mqttBroker.ClientUnsubscribedTopicHandler = new MqttServerClientUnsubscribedTopicHandlerDelegate((mqtteventargs) =>
+                this._mqttBroker.ClientUnsubscribedTopicHandler = new MqttServerClientUnsubscribedTopicHandlerDelegate(mqtteventargs =>
                {
                    entryEventsDone[2] = (mqtteventargs.ClientId.ToString());
                    this.Logger.Debug($"mqttServer Client Unsubscribed  id: {entryEventsDone[2]}");
                });
-                this._mqttBroker.ClientDisconnectedHandler = new MqttServerClientDisconnectedHandlerDelegate((mqtteventargs) =>
+                this._mqttBroker.ClientDisconnectedHandler = new MqttServerClientDisconnectedHandlerDelegate(mqtteventargs =>
                {
                    entryEventsDone[3] = (mqtteventargs.ClientId.ToString());
                    this.Logger.Debug($"mqttServer Client Disconnected  id: {entryEventsDone[3]}");
                });
 
-                iotCore1.HandleRequest(0, $"/connections/{commInterfaceItem.Identifier}/mqttcmdchannel/mqttCmdChannelSetup/brokerPort/setdata",
-                    data: JToken.Parse($"{{'newvalue':{LocalBrokerPort + 1}}}"));
+                iotCore1.HandleRequest(0, 
+                    $"/connections/{commInterfaceItem.Identifier}/mqttcmdchannel/mqttCmdChannelSetup/brokerPort/setdata",
+                    data: new VariantObject()
+                    {
+                        {"newvalue", new VariantValue(LocalBrokerPort + 1)}
+                    });
+
 
                 /* When: 
                  * IP address is changed to local address using commchannel >> brokerip >> setdata service, 
                  */
                 var setIpRequestResult = iotCore1.HandleRequest(0, $"/connections/{commInterfaceItem.Identifier}/mqttcmdchannel/mqttCmdChannelSetup/brokerIP/setdata",
-                     data: JToken.Parse($"{{'newvalue':'{IPAddress.Loopback}'}}"));
+                     data: new VariantObject()
+                     {
+                         { "newvalue", new VariantValue(IPAddress.Loopback.ToString())}
+                     });
+
 
                 //Assert.AreEqual(ResponseCodes.Ok, setIpRequestResult.Code);
 
@@ -835,8 +918,8 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                 this._mqttBroker.ClientUnsubscribedTopicHandler = null;
                 this._mqttBroker.ClientDisconnectedHandler = null;
                 
-                mqttServerNetAdapter1.RequestMessageReceived -= HandleRequest;
-                mqttServerNetAdapter1.EventMessageReceived -= HandleEvent;
+                mqttServerNetAdapter1.RequestReceived -= HandleRequest;
+                mqttServerNetAdapter1.EventReceived -= HandleEvent;
                 await mqttServerNetAdapter1.StopAsync();
                 mqttServerNetAdapter1.Dispose();
                 
@@ -862,23 +945,23 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
 
             var uniqueIotId = Guid.NewGuid().ToString();
             var uniquecmdTopic = uniqueIotId;
-            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
-            var msgConverter = new JsonConverter();
+            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, null, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
+            var msgConverter = new MessageConverter.Json.Newtonsoft.MessageConverter();
             using var mqttServerNetAdapter1 = new MqttServerNetAdapter(iotCore1, iotCore1.Root, msgConverter, new IPEndPoint(IPAddress.Loopback, LocalBrokerPort ), null, uniquecmdTopic);
 
             void HandleRequest(object sender, RequestMessageEventArgs args)
             {
-                args.Response = iotCore1.HandleRequest(args.Request);
+                args.ResponseMessage = iotCore1.HandleRequest(args.RequestMessage);
             }
 
-            mqttServerNetAdapter1.RequestMessageReceived += HandleRequest;
+            mqttServerNetAdapter1.RequestReceived += HandleRequest;
 
             void HandleEvent(object sender, EventMessageEventArgs args)
             {
                 iotCore1.HandleEvent(args.EventMessage);
             }
 
-            mqttServerNetAdapter1.EventMessageReceived += HandleEvent;
+            mqttServerNetAdapter1.EventReceived += HandleEvent;
 
             await mqttServerNetAdapter1.StartAsync();
             iotCore1.RegisterServerNetAdapter(mqttServerNetAdapter1);
@@ -889,24 +972,24 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
             string[] EntryEventsDone = new string[4] { "", "", "", "" };
             try
             {
-                mqttBroker2.ClientConnectedHandler = new MqttServerClientConnectedHandlerDelegate((mqtteventargs) =>
+                mqttBroker2.ClientConnectedHandler = new MqttServerClientConnectedHandlerDelegate(mqtteventargs =>
                {
                    EntryEventsDone[0] = (mqtteventargs.ClientId.ToString());
                    serverConnection.Set();
                    this.Logger.Debug($"mqttServer Client Connected  id: {EntryEventsDone[0]}");
                });
-                mqttBroker2.ClientSubscribedTopicHandler = new MqttServerClientSubscribedHandlerDelegate((mqtteventargs) =>
+                mqttBroker2.ClientSubscribedTopicHandler = new MqttServerClientSubscribedTopicHandlerDelegate(mqtteventargs =>
                {
                    EntryEventsDone[1] = (mqtteventargs.ClientId.ToString());
                    serverSubscription.Set();
                    this.Logger.Debug($"mqttServer Client Subscribed  id: {EntryEventsDone[1]}, topic: {mqtteventargs.TopicFilter.Topic}");
                });
-                this._mqttBroker.ClientUnsubscribedTopicHandler = new MqttServerClientUnsubscribedTopicHandlerDelegate((mqtteventargs) =>
+                this._mqttBroker.ClientUnsubscribedTopicHandler = new MqttServerClientUnsubscribedTopicHandlerDelegate(mqtteventargs =>
                {
                    EntryEventsDone[2] = (mqtteventargs.ClientId.ToString());
                    this.Logger.Debug($"mqttServer Client Unsubscribed  id: {EntryEventsDone[2]}, topic: {mqtteventargs.TopicFilter}");
                });
-                this._mqttBroker.ClientDisconnectedHandler = new MqttServerClientDisconnectedHandlerDelegate((mqtteventargs) =>
+                this._mqttBroker.ClientDisconnectedHandler = new MqttServerClientDisconnectedHandlerDelegate(mqtteventargs =>
                {
                    EntryEventsDone[3] = (mqtteventargs.ClientId.ToString());
                    this.Logger.Debug($"mqttServer Client Disconnected  id: {EntryEventsDone[3]}");
@@ -917,7 +1000,12 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                  */
                 var commInterfaceItem = iotCore1.Root.GetElementByProfile("commInterface");
                 iotCore1.HandleRequest(0, $"/connections/{commInterfaceItem.Identifier}/mqttcmdchannel/mqttCmdChannelSetup/brokerPort/setdata",
-                     JToken.Parse($"{{'newvalue':{broker2Port}}}"));
+                    new VariantObject()
+                    {
+                        {"newvalue", new VariantValue(broker2Port)}
+                    });
+
+                
                 serverSubscription.Wait(TimeSpan.FromMilliseconds(500));
                 serverConnection.Wait(TimeSpan.FromMilliseconds(500));
 
@@ -947,8 +1035,8 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                 this._mqttBroker.ClientUnsubscribedTopicHandler = null;
                 this._mqttBroker.ClientDisconnectedHandler = null;
                
-                mqttServerNetAdapter1.RequestMessageReceived -= HandleRequest;
-                mqttServerNetAdapter1.EventMessageReceived -= HandleEvent;
+                mqttServerNetAdapter1.RequestReceived -= HandleRequest;
+                mqttServerNetAdapter1.EventReceived -= HandleEvent;
                 await mqttServerNetAdapter1.StopAsync();
                 mqttServerNetAdapter1.Dispose();
                 
@@ -968,25 +1056,25 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
              */
             var uniqueIotId = Guid.NewGuid().ToString();
             var uniquecmdTopic = new Random().Next().ToString();
-            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
-            var msgConverter = new JsonConverter();
+            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, null, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
+            var msgConverter = new MessageConverter.Json.Newtonsoft.MessageConverter();
             
             var initialCommandTopic = "cmdTopic";
             using var mqttServerNetAdapter1 = new MqttServerNetAdapter(iotCore1, iotCore1.Root, msgConverter, new IPEndPoint(IPAddress.Loopback, LocalBrokerPort ), null, initialCommandTopic);
 
             void HandleRequest(object sender, RequestMessageEventArgs args)
             {
-                args.Response = iotCore1.HandleRequest(args.Request);
+                args.ResponseMessage = iotCore1.HandleRequest(args.RequestMessage);
             }
 
-            mqttServerNetAdapter1.RequestMessageReceived += HandleRequest;
+            mqttServerNetAdapter1.RequestReceived += HandleRequest;
 
             void HandleEvent(object sender, EventMessageEventArgs args)
             {
                 iotCore1.HandleEvent(args.EventMessage);
             }
 
-            mqttServerNetAdapter1.EventMessageReceived += HandleEvent;
+            mqttServerNetAdapter1.EventReceived += HandleEvent;
 
             iotCore1.RegisterServerNetAdapter(mqttServerNetAdapter1);
             mqttServerNetAdapter1.Start();
@@ -997,26 +1085,26 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
 
             try
             {
-                this._mqttBroker.ClientConnectedHandler = new MqttServerClientConnectedHandlerDelegate((mqtteventargs) =>
+                this._mqttBroker.ClientConnectedHandler = new MqttServerClientConnectedHandlerDelegate(mqtteventargs =>
                {
                    entryEventsDone[0] = (mqtteventargs.ClientId.ToString());
                    this.Logger.Debug($"mqttServer Client Connected  id: {entryEventsDone[0]}");
                });
-                this._mqttBroker.ClientSubscribedTopicHandler = new MqttServerClientSubscribedHandlerDelegate((mqtteventargs) =>
+                this._mqttBroker.ClientSubscribedTopicHandler = new MqttServerClientSubscribedTopicHandlerDelegate(mqtteventargs =>
                {
                    entryEventsDone[1] = (mqtteventargs.ClientId.ToString());
                    topicsSubUnsub[0] = mqtteventargs.TopicFilter.Topic;
                    serverSubscription.Set();
                    this.Logger.Debug($"mqttServer Client Subscribed  id: {entryEventsDone[1]}, topic: {mqtteventargs.TopicFilter.Topic}");
                });
-                this._mqttBroker.ClientUnsubscribedTopicHandler = new MqttServerClientUnsubscribedTopicHandlerDelegate((mqtteventargs) =>
+                this._mqttBroker.ClientUnsubscribedTopicHandler = new MqttServerClientUnsubscribedTopicHandlerDelegate(mqtteventargs =>
                {
                    entryEventsDone[2] = (mqtteventargs.ClientId.ToString());
                    topicsSubUnsub[1] = mqtteventargs.TopicFilter;
                    serverUnsubscription.Set();
                    this.Logger.Debug($"mqttServer Client Unsubscribed  id: {entryEventsDone[2]}, topic: {mqtteventargs.TopicFilter}");
                });
-                this._mqttBroker.ClientDisconnectedHandler = new MqttServerClientDisconnectedHandlerDelegate((mqtteventargs) =>
+                this._mqttBroker.ClientDisconnectedHandler = new MqttServerClientDisconnectedHandlerDelegate(mqtteventargs =>
                {
                    entryEventsDone[3] = (mqtteventargs.ClientId.ToString());
                    this.Logger.Debug($"mqttServer Client Disconnected  id: {entryEventsDone[3]}");
@@ -1029,7 +1117,11 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                 var initialClientId = mqttServerNetAdapter1.CurrentClientId; 
                 var commInterfaceItem = iotCore1.Root.GetElementByProfile("commInterface");
                 iotCore1.HandleRequest(0, $"/connections/{commInterfaceItem.Identifier}/mqttcmdchannel/mqttCmdChannelSetup/cmdTopic/setdata",
-                     JToken.Parse($"{{'newvalue':{uniquecmdTopic}}}"));
+                    new VariantObject()
+                    {
+                        {"newvalue" , new VariantValue(uniquecmdTopic)}
+                    });
+
                 serverSubscription.Wait(TimeSpan.FromMilliseconds(500));
                 serverUnsubscription.Wait(TimeSpan.FromMilliseconds(500));
 
@@ -1053,7 +1145,7 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                         Assert.AreEqual(initialCommandTopic, topicsSubUnsub[1], $"Expected to unsubscribe from cmdTopic");
                     }
 
-                    var newName = iotCore1.HandleRequest(0, $"/connections/{commInterfaceItem.Identifier}/mqttcmdchannel/mqttCmdChannelSetup/cmdTopic/getdata", null).Data["value"].ToString();
+                    var newName = (string)(VariantValue) ((VariantObject)iotCore1.HandleRequest(0, $"/connections/{commInterfaceItem.Identifier}/mqttcmdchannel/mqttCmdChannelSetup/cmdTopic/getdata", null).Data)["value"];
                     Assert.AreEqual(uniquecmdTopic, newName, "Unexpected cmdTopic getdata value");
                 });
             }
@@ -1064,8 +1156,8 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                 this._mqttBroker.ClientUnsubscribedTopicHandler = null;
                 this._mqttBroker.ClientDisconnectedHandler = null;
                 
-                mqttServerNetAdapter1.RequestMessageReceived -= HandleRequest;
-                mqttServerNetAdapter1.EventMessageReceived -= HandleEvent;
+                mqttServerNetAdapter1.RequestReceived -= HandleRequest;
+                mqttServerNetAdapter1.EventReceived -= HandleEvent;
                 mqttServerNetAdapter1.Stop();
                 mqttServerNetAdapter1.Dispose();
                 
@@ -1083,23 +1175,23 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
              */
             var uniqueIotId = Guid.NewGuid().ToString();
             var uniqueReplyTopicName = new Random().Next().ToString();
-            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
-            var msgConverter = new JsonConverter();
+            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, null, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
+            var msgConverter = new MessageConverter.Json.Newtonsoft.MessageConverter();
             using var mqttServerNetAdapter1 = new MqttServerNetAdapter(iotCore1, iotCore1.Root, msgConverter, new IPEndPoint(IPAddress.Loopback, LocalBrokerPort ), null, "cmdTopic");
 
             void HandleRequest(object sender, RequestMessageEventArgs args)
             {
-                args.Response = iotCore1.HandleRequest(args.Request);
+                args.ResponseMessage = iotCore1.HandleRequest(args.RequestMessage);
             }
 
-            mqttServerNetAdapter1.RequestMessageReceived += HandleRequest;
+            mqttServerNetAdapter1.RequestReceived += HandleRequest;
 
             void HandleEvent(object sender, EventMessageEventArgs args)
             {
                 iotCore1.HandleEvent(args.EventMessage);
             }
 
-            mqttServerNetAdapter1.EventMessageReceived += HandleEvent;
+            mqttServerNetAdapter1.EventReceived += HandleEvent;
 
             iotCore1.RegisterServerNetAdapter(mqttServerNetAdapter1);
             mqttServerNetAdapter1.Start();
@@ -1126,13 +1218,18 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                  */
                 var commInterfaceItem = iotCore1.Root.GetElementByProfile("commInterface");
                 iotCore1.HandleRequest(0, $"/connections/{commInterfaceItem.Identifier}/mqttcmdchannel/mqttCmdChannelSetup/defaultReplyTopic/setdata",
-                     data: JToken.Parse($"{{'newvalue':{uniqueReplyTopicName}}}"));
+                     data: new VariantObject()
+                     {
+                         {"newvalue", new VariantValue(uniqueReplyTopicName)}
+                     });
                 
+                
+
                 // send iot request to mqtt broker
-                defaultReplyTopicClient.ApplicationMessageReceivedHandler = new MqttApplicationMessageReceivedHandlerDelegate((mqtteventargs) =>
+                defaultReplyTopicClient.ApplicationMessageReceivedHandler = new MqttApplicationMessageReceivedHandlerDelegate(mqtteventargs =>
                 {
                     iotResponseString = Encoding.UTF8.GetString(mqtteventargs.ApplicationMessage.Payload);
-                    if (iotResponseString.Contains(randomCid.ToString()) && iotResponseString.Contains("data"))
+                    if (iotResponseString.Contains(randomCid.ToString()) && iotResponseString.Contains("profileData"))
                     {
                         msgSentOnMqtt.Set();
                     }
@@ -1150,8 +1247,8 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
             { // don't forget to close shared resources for other tests to reuse
                 defaultReplyTopicClient.DisconnectAsync().Wait();
                 cmdTopicClient.DisconnectAsync().Wait();
-                mqttServerNetAdapter1.RequestMessageReceived -= HandleRequest;
-                mqttServerNetAdapter1.EventMessageReceived -= HandleEvent;
+                mqttServerNetAdapter1.RequestReceived -= HandleRequest;
+                mqttServerNetAdapter1.EventReceived -= HandleEvent;
 
                 mqttServerNetAdapter1.Stop();
                 mqttServerNetAdapter1.Dispose();
@@ -1162,7 +1259,7 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
              * The iot response is received by the new defaultReplyTopic 
              */
             Assert.IsNotNull(iotResponseString);
-            var iotResponseMessage = msgConverter.Deserialize<Message>(iotResponseString);
+            var iotResponseMessage = msgConverter.Deserialize(iotResponseString);
             Assert.That(iotResponseString, Contains.Substring(uniqueIotId));
             Assert.AreEqual(randomCid, iotResponseMessage.Cid);
             Assert.AreEqual("/getidentity", iotResponseMessage.Address);
@@ -1194,34 +1291,34 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
             Assert.That(tempMqttBroker.IsStarted, "tempMqttBroker.IsStarted");
             
             var uniqueIotId = Guid.NewGuid().ToString();
-            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
+            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, null, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
 
             void RequestMessageReceived(object sender, RequestMessageEventArgs e)
             {
-                TestContext.Out.WriteLine($"Message received: {e.Request}");
+                TestContext.Out.WriteLine($"Message received: {e.RequestMessage}");
             }
 
             iotCore1.RequestMessageReceived += RequestMessageReceived;
 
             var brokerReconnected = new ManualResetEventSlim(false);
-            MqttServerNetAdapter mqttServerNetAdapter1 = new MqttServerNetAdapter(iotCore1, iotCore1.Root, new JsonConverter(), new IPEndPoint(IPAddress.Loopback, tempBrokerPort), 
+            MqttServerNetAdapter mqttServerNetAdapter1 = new MqttServerNetAdapter(iotCore1, iotCore1.Root, new MessageConverter.Json.Newtonsoft.MessageConverter(), new IPEndPoint(IPAddress.Loopback, tempBrokerPort), 
                 disconnectionHandler:  ex => { 
                     brokerReconnected.Set();
                 });
 
             void HandleRequest(object sender, RequestMessageEventArgs args)
             {
-                args.Response = iotCore1.HandleRequest(args.Request);
+                args.ResponseMessage = iotCore1.HandleRequest(args.RequestMessage);
             }
 
-            mqttServerNetAdapter1.RequestMessageReceived += HandleRequest;
+            mqttServerNetAdapter1.RequestReceived += HandleRequest;
 
             void HandleEvent(object sender, EventMessageEventArgs args)
             {
                 iotCore1.HandleEvent(args.EventMessage);
             }
 
-            mqttServerNetAdapter1.EventMessageReceived += HandleEvent;
+            mqttServerNetAdapter1.EventReceived += HandleEvent;
 
             iotCore1.RegisterServerNetAdapter(mqttServerNetAdapter1);
             await mqttServerNetAdapter1.StartAsync();
@@ -1276,7 +1373,7 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                 using (var msgReceivedBack = new ManualResetEventSlim())
                 {
                     defaultReplyTopicClient.ApplicationMessageReceivedHandler =
-                        new MqttApplicationMessageReceivedHandlerDelegate((mqtteventargs) =>
+                        new MqttApplicationMessageReceivedHandlerDelegate(mqtteventargs =>
                         {
                             var mqttMsgString = Encoding.UTF8.GetString(mqtteventargs.ApplicationMessage.Payload);
                             if (mqttMsgString.Contains(randomCid.ToString()) && mqttMsgString.Contains("data"))
@@ -1323,8 +1420,8 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                 await cmdTopicClient.DisconnectAsync();
                 cmdTopicClient.Dispose();
                 
-                mqttServerNetAdapter1.RequestMessageReceived -= HandleRequest;
-                mqttServerNetAdapter1.EventMessageReceived -= HandleEvent;
+                mqttServerNetAdapter1.RequestReceived -= HandleRequest;
+                mqttServerNetAdapter1.EventReceived -= HandleEvent;
                 
                 await tempMqttBroker.StopAsync();
                 tempMqttBroker.Dispose();
@@ -1345,34 +1442,34 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
              * runcontrol profile element is mqttconnection/mqttcmdchannel/status
              */
             var uniqueIotId = Guid.NewGuid().ToString();
-            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
-            var msgConverter = new JsonConverter();
+            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, null, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
+            var msgConverter = new MessageConverter.Json.Newtonsoft.MessageConverter();
             using var mqttServerNetAdapter1 = new MqttServerNetAdapter(iotCore1, iotCore1.Root, msgConverter, new IPEndPoint(IPAddress.Loopback, LocalBrokerPort),null);
 
             void HandleRequest(object sender, RequestMessageEventArgs args)
             {
-                args.Response = iotCore1.HandleRequest(args.Request);
+                args.ResponseMessage = iotCore1.HandleRequest(args.RequestMessage);
             }
 
-            mqttServerNetAdapter1.RequestMessageReceived += HandleRequest;
+            mqttServerNetAdapter1.RequestReceived += HandleRequest;
 
             void HandleEvent(object sender, EventMessageEventArgs args)
             {
                 iotCore1.HandleEvent(args.EventMessage);
             }
 
-            mqttServerNetAdapter1.EventMessageReceived += HandleEvent;
+            mqttServerNetAdapter1.EventReceived += HandleEvent;
 
 
             iotCore1.RegisterServerNetAdapter(mqttServerNetAdapter1);
 
-            var mqttConnectionAdr = iotCore1.HandleRequest(this.CreateRequestMessage(adr: "/querytree", data: "{'profile':'commInterface'}")
-                ).Data.SelectToken("$..adrlist[0]").Value<string>();
+            var mqttConnectionAdr = (string)(VariantValue)((VariantArray)((VariantObject)iotCore1.HandleRequest(this.CreateRequestMessage(adr: "/querytree", data: "{'profile':'commInterface'}")).Data)["adrlist"])[0];
+
             Assert.That(mqttConnectionAdr, Does.Contain("mqttconnection"), 
                 message:"Expected First element to be mqttconnection. check element exists or modify query");
 
-            Func<string,string> getStatus = (mqttConnAdr) =>
-                iotCore1.HandleRequest(this.CreateRequestMessage(adr: mqttConnAdr + "/mqttcmdchannel/status/getdata")).Data.SelectToken("$..value").Value<string>();
+            Func<string,string> getStatus = mqttConnAdr => (string) (VariantValue) ((VariantObject)
+                iotCore1.HandleRequest(this.CreateRequestMessage(adr: mqttConnAdr + "/mqttcmdchannel/status/getdata")).Data)["value"];
 
             /* Before mqtt server netadapter is started; Then mqttconnection/mqttcmdchannel/status/getdata is "init" */
             Assert.That(getStatus(mqttConnectionAdr), Is.EqualTo("init"));
@@ -1395,15 +1492,15 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
             mqttServerNetAdapter1.Stop();
             Assert.That(getStatus(mqttConnectionAdr), Is.EqualTo("stopped"));
 
-            mqttServerNetAdapter1.RequestMessageReceived -= HandleRequest;
-            mqttServerNetAdapter1.EventMessageReceived -= HandleEvent;
+            mqttServerNetAdapter1.RequestReceived -= HandleRequest;
+            mqttServerNetAdapter1.EventReceived -= HandleEvent;
         }
 
-        internal RequestMessage CreateRequestMessage(string adr ="/gettree", string data = "null", int code=10, JsonConverter converter=null)
+        internal Message CreateRequestMessage(string adr ="/gettree", string data = "null", int code=10, MessageConverter.Json.Newtonsoft.MessageConverter converter = null)
         {
-            if (converter == null) converter =  new JsonConverter();
+            if (converter == null) converter =  new MessageConverter.Json.Newtonsoft.MessageConverter();
             var cid = new Random().Next(0, int.MaxValue);
-            return converter.Deserialize<RequestMessage>($"{{'code':{code}, 'cid':{cid}, 'adr':'{adr}', 'data':{data}}}");
+            return converter.Deserialize($"{{'code':{code}, 'cid':{cid}, 'adr':'{adr}', 'data':{data}}}");
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T152"), NonParallelizable]
@@ -1416,33 +1513,32 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
              * commchannel runcontrol profile reset service is available - mqttconnection/mqttcmdchannel/status/reset
              */
             var uniqueIotId = Guid.NewGuid().ToString();
-            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
-            var msgConverter = new JsonConverter();
+            var iotCore1 = IoTCoreFactory.Create(uniqueIotId, null, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
+            var msgConverter = new MessageConverter.Json.Newtonsoft.MessageConverter();
             using var mqttServerNetAdapter1 = new MqttServerNetAdapter(iotCore1, iotCore1.Root, msgConverter, new IPEndPoint(IPAddress.Loopback, LocalBrokerPort),null);
 
             void HandleRequest(object sender, RequestMessageEventArgs args)
             {
-                args.Response = iotCore1.HandleRequest(args.Request);
+                args.ResponseMessage = iotCore1.HandleRequest(args.RequestMessage);
             }
 
-            mqttServerNetAdapter1.RequestMessageReceived += HandleRequest;
+            mqttServerNetAdapter1.RequestReceived += HandleRequest;
 
             void HandleEvent(object sender, EventMessageEventArgs args)
             {
                 iotCore1.HandleEvent(args.EventMessage);
             }
 
-            mqttServerNetAdapter1.EventMessageReceived += HandleEvent;
+            mqttServerNetAdapter1.EventReceived += HandleEvent;
 
             iotCore1.RegisterServerNetAdapter(mqttServerNetAdapter1);
 
-            var mqttConnectionAdr = iotCore1.HandleRequest(this.CreateRequestMessage(adr: "/querytree", data: "{'profile':'commInterface'}")
-                ).Data.SelectToken("$..adrlist[0]").Value<string>();
+            var mqttConnectionAdr = (string)(VariantValue)((VariantArray)((VariantObject)iotCore1.HandleRequest(this.CreateRequestMessage(adr: "/querytree", data: "{'profile':'commInterface'}")).Data)["adrlist"])[0];
             Assert.That(mqttConnectionAdr, Does.Contain("mqttconnection"), 
                 message:"Expected First element to be mqttconnection. check element exists or modify query");
 
-            Func<string,string> getStatus = (mqttConnAdr) =>
-                iotCore1.HandleRequest(this.CreateRequestMessage(adr: mqttConnAdr + "/mqttcmdchannel/status/getdata")).Data.SelectToken("$..value").Value<string>();
+            Func<string,string> getStatus = mqttConnAdr => (string) (VariantValue) ((VariantObject)
+                iotCore1.HandleRequest(this.CreateRequestMessage(adr: mqttConnAdr + "/mqttcmdchannel/status/getdata")).Data)["value"];
 
             mqttServerNetAdapter1.Start();
 
@@ -1465,8 +1561,8 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
             mqttServerNetAdapter1.Stop();
             Assert.That(getStatus(mqttConnectionAdr), Is.EqualTo("stopped"));
 
-            mqttServerNetAdapter1.RequestMessageReceived -= HandleRequest;
-            mqttServerNetAdapter1.EventMessageReceived -= HandleEvent;
+            mqttServerNetAdapter1.RequestReceived -= HandleRequest;
+            mqttServerNetAdapter1.EventReceived -= HandleEvent;
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T153"), NonParallelizable]
@@ -1478,29 +1574,27 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
              * mqtt server net adapter is started
              * commchannel runcontrol profile preset service is available - mqttconnection/mqttcmdchannel/status/preset
              */
-            var iotCore1 = IoTCoreFactory.Create(Guid.NewGuid().ToString(), new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
+            var iotCore1 = IoTCoreFactory.Create(Guid.NewGuid().ToString(), null, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
             
-            using var mqttServerNetAdapter = new MqttServerNetAdapter(iotCore1, iotCore1.Root, new JsonConverter(), new IPEndPoint(IPAddress.Loopback, LocalBrokerPort),null);
+            using var mqttServerNetAdapter = new MqttServerNetAdapter(iotCore1, iotCore1.Root, new MessageConverter.Json.Newtonsoft.MessageConverter(), new IPEndPoint(IPAddress.Loopback, LocalBrokerPort),null);
 
             void HandleRequest(object sender, RequestMessageEventArgs args)
             {
-                args.Response = iotCore1.HandleRequest(args.Request);
+                args.ResponseMessage = iotCore1.HandleRequest(args.RequestMessage);
             }
 
-            mqttServerNetAdapter.RequestMessageReceived += HandleRequest;
+            mqttServerNetAdapter.RequestReceived += HandleRequest;
 
             void HandleEvent(object sender, EventMessageEventArgs args)
             {
                 iotCore1.HandleEvent(args.EventMessage);
             }
 
-            mqttServerNetAdapter.EventMessageReceived += HandleEvent;
+            mqttServerNetAdapter.EventReceived += HandleEvent;
 
             iotCore1.RegisterServerNetAdapter(mqttServerNetAdapter);
 
-            var mqttConnectionAdr = iotCore1.HandleRequest(
-                this.CreateRequestMessage(adr: "/querytree", data: "{'profile':'commInterface'}")
-                ).Data.SelectToken("$..adrlist[0]").Value<string>();
+            var mqttConnectionAdr = (string) (VariantValue)((VariantArray)((VariantObject) iotCore1.HandleRequest(this.CreateRequestMessage(adr: "/querytree", data: "{'profile':'commInterface'}")).Data)["adrlist"])[0];
             Assert.That(mqttConnectionAdr, Does.Contain("mqttconnection"), 
                 message:"Expected First element to be mqttconnection. check element exists or modify query");
 
@@ -1512,37 +1606,37 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                     this.CreateRequestMessage(adr: mqttConnectionAdr + "/mqttcmdchannel/status/preset/getdata")).Code, 
                 Is.EqualTo(ResponseCodes.Success));
 
-            mqttServerNetAdapter.RequestMessageReceived -= HandleRequest;
-            mqttServerNetAdapter.EventMessageReceived -= HandleEvent;
-            mqttServerNetAdapter.Stop();
-            mqttServerNetAdapter.Dispose();
+            mqttServerNetAdapter.RequestReceived -= HandleRequest;
+            mqttServerNetAdapter.EventReceived -= HandleEvent;
+            //mqttServerNetAdapter.Stop();
+            //mqttServerNetAdapter.Dispose();
             iotCore1.RemoveServerNetAdapter(mqttServerNetAdapter);
         }
 
         [Test, NonParallelizable]
         public void Test_Statetransitions_CommInterface_Running_Accepting_Messages()
         {
-            var iotCore1 = IoTCoreFactory.Create(Guid.NewGuid().ToString(), new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
+            var iotCore1 = IoTCoreFactory.Create(Guid.NewGuid().ToString(), null, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
             
-            using  var mqttServerNetAdapter = new MqttServerNetAdapter(iotCore1, iotCore1.Root, new JsonConverter(), new IPEndPoint(IPAddress.Loopback, LocalBrokerPort));
+            using  var mqttServerNetAdapter = new MqttServerNetAdapter(iotCore1, iotCore1.Root, new MessageConverter.Json.Newtonsoft.MessageConverter(), new IPEndPoint(IPAddress.Loopback, LocalBrokerPort));
 
             void HandleRequest(object sender, RequestMessageEventArgs args)
             {
-                args.Response = iotCore1.HandleRequest(args.Request);
+                args.ResponseMessage = iotCore1.HandleRequest(args.RequestMessage);
             }
 
-            mqttServerNetAdapter.RequestMessageReceived += HandleRequest;
+            mqttServerNetAdapter.RequestReceived += HandleRequest;
 
             void HandleEvent(object sender, EventMessageEventArgs args)
             {
                 iotCore1.HandleEvent(args.EventMessage);
             }
 
-            mqttServerNetAdapter.EventMessageReceived += HandleEvent;
+            mqttServerNetAdapter.EventReceived += HandleEvent;
 
             iotCore1.RegisterServerNetAdapter(mqttServerNetAdapter);
 
-            var commInterfaceAddress = iotCore1.HandleRequest(this.CreateRequestMessage(adr: "/querytree", data: "{'profile':'commInterface'}")).Data?.SelectToken("$..adrlist[0]")?.Value<string>();
+            var commInterfaceAddress = (string) (VariantValue) ((VariantArray)((VariantObject)iotCore1.HandleRequest(this.CreateRequestMessage(adr: "/querytree", data: "{'profile':'commInterface'}")).Data)["adrlist"])[0];
 
             Assert.That(commInterfaceAddress, Does.Contain("mqttconnection"), 
                 message:"Expected First element to be mqttconnection. check element exists or modify query");
@@ -1555,8 +1649,8 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                     this.CreateRequestMessage(adr: commInterfaceAddress + "/mqttcmdchannel/status/preset/getdata")).Code, 
                 Is.EqualTo(ResponseCodes.Success));
 
-            Func<string,string> getStatus = (mqttConnAdr) =>
-                iotCore1.HandleRequest(this.CreateRequestMessage(adr: mqttConnAdr + "/mqttcmdchannel/status/getdata")).Data?.SelectToken("$..value")?.Value<string>();
+            Func<string,string> getStatus = mqttConnAdr => (string) (VariantValue) ((VariantObject)
+                iotCore1.HandleRequest(this.CreateRequestMessage(adr: mqttConnAdr + "/mqttcmdchannel/status/getdata")).Data)["value"];
 
             Assert.That(
                 iotCore1.HandleRequest(
@@ -1576,7 +1670,7 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                 var connectionResult = mqttClient.ConnectAsync(MqttHelper.BuildOptions(IPAddress.Loopback, LocalBrokerPort)).GetAwaiter().GetResult();
                 Assert.That(connectionResult.ResultCode, Is.EqualTo(MqttClientConnectResultCode.Success));
 
-                mqttClient.ApplicationMessageReceivedHandler = new MqttApplicationMessageReceivedHandlerDelegate((e) =>
+                mqttClient.ApplicationMessageReceivedHandler = new MqttApplicationMessageReceivedHandlerDelegate(e =>
                 {
                     manualResetEventSlim.Set();    
                 });
@@ -1599,37 +1693,37 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                 Assert.That(manualResetEventSlim.IsSet);
             }
 
-            mqttServerNetAdapter.RequestMessageReceived -= HandleRequest;
-            mqttServerNetAdapter.EventMessageReceived -= HandleEvent;
+            mqttServerNetAdapter.RequestReceived -= HandleRequest;
+            mqttServerNetAdapter.EventReceived -= HandleEvent;
 
-            mqttServerNetAdapter.Stop();
-            mqttServerNetAdapter.Dispose();
+            //mqttServerNetAdapter.Stop();
+            //mqttServerNetAdapter.Dispose();
             iotCore1.RemoveServerNetAdapter(mqttServerNetAdapter);
         }
 
         [Test, NonParallelizable]
         public void Test_Statetransitions_CommInterface_Stopped_Not_Accepting_Messages()
         {
-            var iotCore1 = IoTCoreFactory.Create(Guid.NewGuid().ToString(), new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
-            using var mqttServerNetAdapter = new MqttServerNetAdapter(iotCore1, iotCore1.Root, new JsonConverter(), new IPEndPoint(IPAddress.Loopback, LocalBrokerPort));
+            var iotCore1 = IoTCoreFactory.Create(Guid.NewGuid().ToString(), null, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
+            using var mqttServerNetAdapter = new MqttServerNetAdapter(iotCore1, iotCore1.Root, new MessageConverter.Json.Newtonsoft.MessageConverter(), new IPEndPoint(IPAddress.Loopback, LocalBrokerPort));
 
             void HandleRequest(object sender, RequestMessageEventArgs args)
             {
-                args.Response = iotCore1.HandleRequest(args.Request);
+                args.ResponseMessage = iotCore1.HandleRequest(args.RequestMessage);
             }
 
-            mqttServerNetAdapter.RequestMessageReceived += HandleRequest;
+            mqttServerNetAdapter.RequestReceived += HandleRequest;
 
             void HandleEvent(object sender, EventMessageEventArgs args)
             {
                 iotCore1.HandleEvent(args.EventMessage);
             }
 
-            mqttServerNetAdapter.EventMessageReceived += HandleEvent;
+            mqttServerNetAdapter.EventReceived += HandleEvent;
 
             iotCore1.RegisterServerNetAdapter(mqttServerNetAdapter);
 
-            var commInterfaceAddress = iotCore1.HandleRequest(this.CreateRequestMessage(adr: "/querytree", data: "{'profile':'commInterface'}")).Data?.SelectToken("$..adrlist[0]")?.Value<string>();
+            var commInterfaceAddress =  (string)(VariantValue)((VariantArray)((VariantObject)iotCore1.HandleRequest(this.CreateRequestMessage(adr: "/querytree", data: "{'profile':'commInterface'}")).Data)["adrlist"])[0];
 
             Assert.That(commInterfaceAddress, Does.Contain("mqttconnection"), 
                 message:"Expected First element to be mqttconnection. check element exists or modify query");
@@ -1642,8 +1736,8 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                     this.CreateRequestMessage(adr: commInterfaceAddress + "/mqttcmdchannel/status/preset/getdata")).Code, 
                 Is.EqualTo(ResponseCodes.Success));
 
-            Func<string,string> getStatus = (mqttConnAdr) =>
-                iotCore1.HandleRequest(this.CreateRequestMessage(adr: mqttConnAdr + "/mqttcmdchannel/status/getdata")).Data?.SelectToken("$..value")?.Value<string>();
+            Func<string,string> getStatus = mqttConnAdr =>(string)(VariantValue)
+                ((VariantObject)iotCore1.HandleRequest(this.CreateRequestMessage(adr: mqttConnAdr + "/mqttcmdchannel/status/getdata")).Data)["value"];
 
             Assert.That(
                 iotCore1.HandleRequest(
@@ -1669,7 +1763,7 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                 var connectionResult = mqttClient.ConnectAsync(MqttHelper.BuildOptions(IPAddress.Loopback, LocalBrokerPort)).GetAwaiter().GetResult();
                 Assert.That(connectionResult.ResultCode, Is.EqualTo(MqttClientConnectResultCode.Success));
 
-                mqttClient.ApplicationMessageReceivedHandler = new MqttApplicationMessageReceivedHandlerDelegate((e) =>
+                mqttClient.ApplicationMessageReceivedHandler = new MqttApplicationMessageReceivedHandlerDelegate(e =>
                 {
                     Assert.Fail("This message should not be received.");
                 });
@@ -1692,37 +1786,37 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
 
             }
 
-            mqttServerNetAdapter.RequestMessageReceived -= HandleRequest;
-            mqttServerNetAdapter.EventMessageReceived -= HandleEvent;
-            mqttServerNetAdapter.Stop();
-            mqttServerNetAdapter.Dispose();
+            mqttServerNetAdapter.RequestReceived -= HandleRequest;
+            mqttServerNetAdapter.EventReceived -= HandleEvent;
+            //mqttServerNetAdapter.Stop();
+            //mqttServerNetAdapter.Dispose();
             iotCore1.RemoveServerNetAdapter(mqttServerNetAdapter);
         }
 
         [Test, NonParallelizable]
         public void Test_Statetransitions_CommChannel_Running_Accepting_Messages()
         {
-            var iotCore1 = IoTCoreFactory.Create(Guid.NewGuid().ToString(), new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
+            var iotCore1 = IoTCoreFactory.Create(Guid.NewGuid().ToString(), null, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
             
-            var mqttServerNetAdapter = new MqttServerNetAdapter(iotCore1, iotCore1.Root, new JsonConverter(), new IPEndPoint(IPAddress.Loopback, LocalBrokerPort));
+            var mqttServerNetAdapter = new MqttServerNetAdapter(iotCore1, iotCore1.Root, new MessageConverter.Json.Newtonsoft.MessageConverter(), new IPEndPoint(IPAddress.Loopback, LocalBrokerPort));
 
             void HandleRequest(object sender, RequestMessageEventArgs args)
             {
-                args.Response = iotCore1.HandleRequest(args.Request);
+                args.ResponseMessage = iotCore1.HandleRequest(args.RequestMessage);
             }
 
-            mqttServerNetAdapter.RequestMessageReceived += HandleRequest;
+            mqttServerNetAdapter.RequestReceived += HandleRequest;
 
             void HandleEvent(object sender, EventMessageEventArgs args)
             {
                 iotCore1.HandleEvent(args.EventMessage);
             }
 
-            mqttServerNetAdapter.EventMessageReceived += HandleEvent;
+            mqttServerNetAdapter.EventReceived += HandleEvent;
 
             iotCore1.RegisterServerNetAdapter(mqttServerNetAdapter);
 
-            var commChannelAddress = iotCore1.HandleRequest(this.CreateRequestMessage(adr: "/querytree", data: "{'profile':'commchannel'}")).Data?.SelectToken("$..adrlist[0]")?.Value<string>();
+            var commChannelAddress = (string)(VariantValue)((VariantArray)((VariantObject)iotCore1.HandleRequest(this.CreateRequestMessage(adr: "/querytree", data: "{'profile':'commchannel'}")).Data)["adrlist"])[0];
             
             mqttServerNetAdapter.Start();
 
@@ -1732,7 +1826,7 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                     this.CreateRequestMessage(adr: commChannelAddress + "/status/preset/getdata")).Code, 
                 Is.EqualTo(ResponseCodes.Success));
 
-            string GetStatus(string mqttConnAdr) => iotCore1.HandleRequest(this.CreateRequestMessage(adr: mqttConnAdr + "/status/getdata")).Data?.SelectToken("$..value")?.Value<string>();
+            string GetStatus(string mqttConnAdr) => (string)(VariantValue)((VariantObject)iotCore1.HandleRequest(this.CreateRequestMessage(adr: mqttConnAdr + "/status/getdata")).Data)["value"];
 
             /* When in "init" status (mqttcmdchannel/status), Then Reset (mqttcmdchannel/status/reset) will restart */
             Assert.That(
@@ -1748,7 +1842,7 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                 var connectionResult = mqttClient.ConnectAsync(MqttHelper.BuildOptions(IPAddress.Loopback, LocalBrokerPort)).GetAwaiter().GetResult();
                 Assert.That(connectionResult.ResultCode, Is.EqualTo(MqttClientConnectResultCode.Success));
 
-                mqttClient.ApplicationMessageReceivedHandler = new MqttApplicationMessageReceivedHandlerDelegate((e) =>
+                mqttClient.ApplicationMessageReceivedHandler = new MqttApplicationMessageReceivedHandlerDelegate(e =>
                 {
                     manualResetEventSlim.Set();    
                 });
@@ -1772,37 +1866,37 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                 Assert.That(manualResetEventSlim.IsSet);
             }
 
-            mqttServerNetAdapter.RequestMessageReceived -= HandleRequest;
-            mqttServerNetAdapter.EventMessageReceived -= HandleEvent;
-            mqttServerNetAdapter.Stop();
-            mqttServerNetAdapter.Dispose();
+            mqttServerNetAdapter.RequestReceived -= HandleRequest;
+            mqttServerNetAdapter.EventReceived -= HandleEvent;
+            //mqttServerNetAdapter.Stop();
+            //mqttServerNetAdapter.Dispose();
             iotCore1.RemoveServerNetAdapter(mqttServerNetAdapter);
         }
 
         [Test, NonParallelizable]
         public void Test_Statetransitions_CommChannel_Stopped_Not_Accepting_Messages()
         {
-            var iotCore1 = IoTCoreFactory.Create(Guid.NewGuid().ToString(), new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
+            var iotCore1 = IoTCoreFactory.Create(Guid.NewGuid().ToString(), null, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
             
-            var mqttServerNetAdapter = new MqttServerNetAdapter(iotCore1, iotCore1.Root, new JsonConverter(), new IPEndPoint(IPAddress.Loopback, LocalBrokerPort));
+            var mqttServerNetAdapter = new MqttServerNetAdapter(iotCore1, iotCore1.Root, new MessageConverter.Json.Newtonsoft.MessageConverter(), new IPEndPoint(IPAddress.Loopback, LocalBrokerPort));
 
             void HandleRequest(object sender, RequestMessageEventArgs args)
             {
-                args.Response = iotCore1.HandleRequest(args.Request);
+                args.ResponseMessage = iotCore1.HandleRequest(args.RequestMessage);
             }
 
-            mqttServerNetAdapter.RequestMessageReceived += HandleRequest;
+            mqttServerNetAdapter.RequestReceived += HandleRequest;
 
             void HandleEvent(object sender, EventMessageEventArgs args)
             {
                 iotCore1.HandleEvent(args.EventMessage);
             }
 
-            mqttServerNetAdapter.EventMessageReceived += HandleEvent;
+            mqttServerNetAdapter.EventReceived += HandleEvent;
 
             iotCore1.RegisterServerNetAdapter(mqttServerNetAdapter);
 
-            var commChannelAddress = iotCore1.HandleRequest(this.CreateRequestMessage(adr: "/querytree", data: "{'profile':'commchannel'}")).Data?.SelectToken("$..adrlist[0]")?.Value<string>();
+            var commChannelAddress = (string)(VariantValue)((VariantArray)((VariantObject)iotCore1.HandleRequest(this.CreateRequestMessage(adr: "/querytree", data: "{'profile':'commchannel'}")).Data)["adrlist"])[0];
             
             mqttServerNetAdapter.Start();
 
@@ -1812,7 +1906,7 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                     this.CreateRequestMessage(adr: commChannelAddress + "/status/preset/getdata")).Code, 
                 Is.EqualTo(ResponseCodes.Success));
 
-            string GetStatus(string mqttConnAdr) => iotCore1.HandleRequest(this.CreateRequestMessage(adr: mqttConnAdr + "/status/getdata")).Data?.SelectToken("$..value")?.Value<string>();
+            string GetStatus(string mqttConnAdr) => (string)(VariantValue)((VariantObject)iotCore1.HandleRequest(this.CreateRequestMessage(adr: mqttConnAdr + "/status/getdata")).Data)["value"];
 
             /* When in "init" status (mqttcmdchannel/status), Then Reset (mqttcmdchannel/status/reset) will restart */
             Assert.That(
@@ -1834,7 +1928,7 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                 var connectionResult = mqttClient.ConnectAsync(MqttHelper.BuildOptions(IPAddress.Loopback, LocalBrokerPort)).GetAwaiter().GetResult();
                 Assert.That(connectionResult.ResultCode, Is.EqualTo(MqttClientConnectResultCode.Success));
 
-                mqttClient.ApplicationMessageReceivedHandler = new MqttApplicationMessageReceivedHandlerDelegate((e) =>
+                mqttClient.ApplicationMessageReceivedHandler = new MqttApplicationMessageReceivedHandlerDelegate(e =>
                 {
                     manualResetEventSlim.Set();
                     Assert.Fail("This message should not be received upon stopped.");
@@ -1859,37 +1953,37 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                 Assert.That(!manualResetEventSlim.IsSet);
             }
 
-            mqttServerNetAdapter.RequestMessageReceived -= HandleRequest;
-            mqttServerNetAdapter.EventMessageReceived -= HandleEvent;
-            mqttServerNetAdapter.Stop();
-            mqttServerNetAdapter.Dispose();
+            mqttServerNetAdapter.RequestReceived -= HandleRequest;
+            mqttServerNetAdapter.EventReceived -= HandleEvent;
+            //mqttServerNetAdapter.Stop();
+            //mqttServerNetAdapter.Dispose();
             iotCore1.RemoveServerNetAdapter(mqttServerNetAdapter);
         }
 
         [Test, NonParallelizable]
         public void Test_Statetransitions_CommChannel_Running_To_Running_Transition()
         {
-            var iotCore1 = IoTCoreFactory.Create(Guid.NewGuid().ToString(), new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
+            var iotCore1 = IoTCoreFactory.Create(Guid.NewGuid().ToString(), null, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
             
-            var mqttServerNetAdapter = new MqttServerNetAdapter(iotCore1, iotCore1.Root, new JsonConverter(), new IPEndPoint(IPAddress.Loopback, LocalBrokerPort));
+            var mqttServerNetAdapter = new MqttServerNetAdapter(iotCore1, iotCore1.Root, new MessageConverter.Json.Newtonsoft.MessageConverter(), new IPEndPoint(IPAddress.Loopback, LocalBrokerPort));
 
             void HandleRequest(object sender, RequestMessageEventArgs args)
             {
-                args.Response = iotCore1.HandleRequest(args.Request);
+                args.ResponseMessage = iotCore1.HandleRequest(args.RequestMessage);
             }
 
-            mqttServerNetAdapter.RequestMessageReceived += HandleRequest;
+            mqttServerNetAdapter.RequestReceived += HandleRequest;
 
             void HandleEvent(object sender, EventMessageEventArgs args)
             {
                 iotCore1.HandleEvent(args.EventMessage);
             }
 
-            mqttServerNetAdapter.EventMessageReceived += HandleEvent;
+            mqttServerNetAdapter.EventReceived += HandleEvent;
 
             iotCore1.RegisterServerNetAdapter(mqttServerNetAdapter);
 
-            var commChannelAddress = iotCore1.HandleRequest(this.CreateRequestMessage(adr: "/querytree", data: "{'profile':'commchannel'}")).Data?.SelectToken("$..adrlist[0]")?.Value<string>();
+            var commChannelAddress = (string)(VariantValue)((VariantArray)((VariantObject)iotCore1.HandleRequest(this.CreateRequestMessage(adr: "/querytree", data: "{'profile':'commchannel'}")).Data)["adrlist"])[0];
             
             mqttServerNetAdapter.Start();
 
@@ -1899,7 +1993,7 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                     this.CreateRequestMessage(adr: commChannelAddress + "/status/preset/getdata")).Code, 
                 Is.EqualTo(ResponseCodes.Success));
 
-            string GetStatus(string mqttConnAdr) => iotCore1.HandleRequest(this.CreateRequestMessage(adr: mqttConnAdr + "/status/getdata")).Data?.SelectToken("$..value")?.Value<string>();
+            string GetStatus(string mqttConnAdr) => (string)(VariantValue)((VariantObject)iotCore1.HandleRequest(this.CreateRequestMessage(adr: mqttConnAdr + "/status/getdata")).Data)["value"];
 
             /* When in "init" status (mqttcmdchannel/status), Then Reset (mqttcmdchannel/status/reset) will restart */
             Assert.That(
@@ -1914,37 +2008,37 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                 Is.EqualTo(ResponseCodes.Success));
             Assert.That(GetStatus(commChannelAddress), Is.EqualTo("running"), "Status of commchannel runcontrol should be stopped.");
 
-            mqttServerNetAdapter.RequestMessageReceived -= HandleRequest;
-            mqttServerNetAdapter.EventMessageReceived -= HandleEvent;
-            mqttServerNetAdapter.Stop();
-            mqttServerNetAdapter.Dispose();
+            mqttServerNetAdapter.RequestReceived -= HandleRequest;
+            mqttServerNetAdapter.EventReceived -= HandleEvent;
+            //mqttServerNetAdapter.Stop();
+            //mqttServerNetAdapter.Dispose();
             iotCore1.RemoveServerNetAdapter(mqttServerNetAdapter);
         }
 
         [Test, NonParallelizable]
         public void Test_Statetransitions_CommChannel_Stopped_To_Running_Transition()
         {
-            var iotCore1 = IoTCoreFactory.Create(Guid.NewGuid().ToString(), new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
+            var iotCore1 = IoTCoreFactory.Create(Guid.NewGuid().ToString(), null, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
             
-            var mqttServerNetAdapter = new MqttServerNetAdapter(iotCore1, iotCore1.Root, new JsonConverter(), new IPEndPoint(IPAddress.Loopback, LocalBrokerPort));
+            var mqttServerNetAdapter = new MqttServerNetAdapter(iotCore1, iotCore1.Root, new MessageConverter.Json.Newtonsoft.MessageConverter(), new IPEndPoint(IPAddress.Loopback, LocalBrokerPort));
 
             void HandleRequest(object sender, RequestMessageEventArgs args)
             {
-                args.Response = iotCore1.HandleRequest(args.Request);
+                args.ResponseMessage = iotCore1.HandleRequest(args.RequestMessage);
             }
 
-            mqttServerNetAdapter.RequestMessageReceived += HandleRequest;
+            mqttServerNetAdapter.RequestReceived += HandleRequest;
 
             void HandleEvent(object sender, EventMessageEventArgs args)
             {
                 iotCore1.HandleEvent(args.EventMessage);
             }
 
-            mqttServerNetAdapter.EventMessageReceived += HandleEvent;
+            mqttServerNetAdapter.EventReceived += HandleEvent;
 
             iotCore1.RegisterServerNetAdapter(mqttServerNetAdapter);
 
-            var commChannelAddress = iotCore1.HandleRequest(this.CreateRequestMessage(adr: "/querytree", data: "{'profile':'commchannel'}")).Data?.SelectToken("$..adrlist[0]")?.Value<string>();
+            var commChannelAddress = (string)(VariantValue)((VariantArray)((VariantObject)iotCore1.HandleRequest(this.CreateRequestMessage(adr: "/querytree", data: "{'profile':'commchannel'}")).Data)["adrlist"])[0];
             
             mqttServerNetAdapter.Start();
 
@@ -1954,7 +2048,7 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                     this.CreateRequestMessage(adr: commChannelAddress + "/status/preset/getdata")).Code, 
                 Is.EqualTo(ResponseCodes.Success));
 
-            string GetStatus(string mqttConnAdr) => iotCore1.HandleRequest(this.CreateRequestMessage(adr: mqttConnAdr + "/status/getdata")).Data?.SelectToken("$..value")?.Value<string>();
+            string GetStatus(string mqttConnAdr) => (string)(VariantValue)((VariantObject) iotCore1.HandleRequest(this.CreateRequestMessage(adr: mqttConnAdr + "/status/getdata")).Data)["value"];
 
             /* When in "init" status (mqttcmdchannel/status), Then Reset (mqttcmdchannel/status/reset) will restart */
             Assert.That(
@@ -1969,37 +2063,40 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                 Is.EqualTo(ResponseCodes.Success));
             Assert.That(GetStatus(commChannelAddress), Is.EqualTo("running"), "Status of commchannel runcontrol should be stopped.");
 
-            mqttServerNetAdapter.RequestMessageReceived -= HandleRequest;
-            mqttServerNetAdapter.EventMessageReceived -= HandleEvent;
-            mqttServerNetAdapter.Stop();
-            mqttServerNetAdapter.Dispose();
+            mqttServerNetAdapter.RequestReceived -= HandleRequest;
+            mqttServerNetAdapter.EventReceived -= HandleEvent;
+            //mqttServerNetAdapter.Stop();
+            //mqttServerNetAdapter.Dispose();
             iotCore1.RemoveServerNetAdapter(mqttServerNetAdapter);
         }
 
         [Test, NonParallelizable]
         public void Test_Statetransitions_CommChannel_Running_To_Error_Transition()
         {
-            var iotCore1 = IoTCoreFactory.Create(Guid.NewGuid().ToString(), new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
+            var iotCore1 = IoTCoreFactory.Create(Guid.NewGuid().ToString(), null, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug));
             
-            var mqttServerNetAdapter = new MqttServerNetAdapter(iotCore1, iotCore1.Root, new JsonConverter(), new IPEndPoint(IPAddress.Loopback, 9999));
+            var mqttServerNetAdapter = new MqttServerNetAdapter(iotCore1, iotCore1.Root, new MessageConverter.Json.Newtonsoft.MessageConverter(), new IPEndPoint(IPAddress.Loopback, 9999));
 
             void HandleRequest(object sender, RequestMessageEventArgs args)
             {
-                args.Response = iotCore1.HandleRequest(args.Request);
+                args.ResponseMessage = iotCore1.HandleRequest(args.RequestMessage);
             }
 
-            mqttServerNetAdapter.RequestMessageReceived += HandleRequest;
+            mqttServerNetAdapter.RequestReceived += HandleRequest;
 
             void HandleEvent(object sender, EventMessageEventArgs args)
             {
                 iotCore1.HandleEvent(args.EventMessage);
             }
 
-            mqttServerNetAdapter.EventMessageReceived += HandleEvent;
+            mqttServerNetAdapter.EventReceived += HandleEvent;
 
             iotCore1.RegisterServerNetAdapter(mqttServerNetAdapter);
 
-            var commChannelAddress = iotCore1.HandleRequest(this.CreateRequestMessage(adr: "/querytree", data: "{'profile':'commchannel'}")).Data?.SelectToken("$..adrlist[0]")?.Value<string>();
+            //var commChannelAddress = iotCore1.HandleRequest(this.CreateRequestMessage(adr: "/querytree", data: "{'profile':'commchannel'}")).Data?.SelectToken("$..adrlist[0]")?.Value<string>();
+
+            var dataAsVariant = (VariantObject) iotCore1.HandleRequest(this.CreateRequestMessage(adr: "/querytree", data: "{'profile':'commchannel'}")).Data;
+            var commChannelAddress = (VariantValue) ((VariantArray) dataAsVariant["adrlist"])[0];
 
             try
             {
@@ -2016,14 +2113,14 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                     this.CreateRequestMessage(adr: commChannelAddress + "/status/preset/getdata")).Code, 
                 Is.EqualTo(ResponseCodes.Success));
 
-            string GetStatus(string mqttConnAdr) => iotCore1.HandleRequest(this.CreateRequestMessage(adr: mqttConnAdr + "/status/getdata")).Data?.SelectToken("$..value")?.Value<string>();
+            string GetStatus(string mqttConnAdr) => (string)(VariantValue)((VariantObject)iotCore1.HandleRequest(this.CreateRequestMessage(adr: mqttConnAdr + "/status/getdata")).Data)["value"];
 
             /* When in "init" status (mqttcmdchannel/status), Then Reset (mqttcmdchannel/status/reset) will restart */
             Assert.That(
                 iotCore1.HandleRequest(
                     this.CreateRequestMessage(adr: commChannelAddress + "/status/start")).Code, 
                 Is.EqualTo(ResponseCodes.InternalError));
-            Assert.That(GetStatus(commChannelAddress), Is.EqualTo("error"),"Status of commchannel runcontrol should be started.");
+            Assert.That(GetStatus((string)commChannelAddress), Is.EqualTo("error"),"Status of commchannel runcontrol should be started.");
 
             try
             {
@@ -2035,9 +2132,9 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                 Logger.Warn("Expected exception.");
             }
 
-            mqttServerNetAdapter.RequestMessageReceived -= HandleRequest;
-            mqttServerNetAdapter.EventMessageReceived -= HandleEvent;
-            mqttServerNetAdapter.Dispose();
+            mqttServerNetAdapter.RequestReceived -= HandleRequest;
+            mqttServerNetAdapter.EventReceived -= HandleEvent;
+            //mqttServerNetAdapter.Dispose();
             iotCore1.RemoveServerNetAdapter(mqttServerNetAdapter);
         }
 
@@ -2053,13 +2150,13 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                     new IPEndPoint(
                         IPAddress.Loopback,
                         LocalBrokerPort),
-                    new JsonConverter(),
+                    new MessageConverter.Json.Newtonsoft.MessageConverter(),
                     TimeSpan.FromSeconds(1));
 
                 Assert.DoesNotThrow(() =>
                 {
-                    client.SendRequest(new RequestMessage(10, "/gettree",
-                        Helpers.ToJson(new GetTreeRequestServiceData("/", 0))));
+                    client.SendRequest(new Message(RequestCodes.Request, 10, "/gettree",
+                        Variant.FromObject(new GetTreeRequestServiceData("/", 0))));
                 });
             }
             finally
@@ -2082,7 +2179,7 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                 new IPEndPoint(
                     IPAddress.Loopback,
                     LocalBrokerPort), 
-                new JsonConverter(), 
+                new MessageConverter.Json.Newtonsoft.MessageConverter(), 
                 TimeSpan.FromSeconds(1));
 
             var msgSentOnMqtt = new ManualResetEventSlim();
@@ -2091,7 +2188,7 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
             Assert.That(connectionResult2.ResultCode, Is.EqualTo(MqttClientConnectResultCode.Success));
             try 
             { 
-                brokerAppMessagesClient.ApplicationMessageReceivedHandler = new MqttApplicationMessageReceivedHandlerDelegate((mqtteventargs) => 
+                brokerAppMessagesClient.ApplicationMessageReceivedHandler = new MqttApplicationMessageReceivedHandlerDelegate(mqtteventargs => 
                 {
                    iotResponseString = Encoding.UTF8.GetString(mqtteventargs.ApplicationMessage.Payload);
                    if (mqtteventargs.ApplicationMessage.Topic == eventTopic && iotResponseString.Contains(randomCid.ToString()))
@@ -2102,7 +2199,8 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
                 var subscribeResult2 = brokerAppMessagesClient.SubscribeAsync(eventTopic).GetAwaiter().GetResult();
                 Assert.AreEqual(MqttClientSubscribeResultCode.GrantedQoS0, subscribeResult2.Items[0].ResultCode);
                 //* When SendRequest sends
-                client.SendRequest(new RequestMessage(10, "/gettree", Helpers.ToJson(new GetTreeRequestServiceData("/", 0))));
+
+                client.SendRequest(new Message(RequestCodes.Request, 10, "/gettree", Variant.FromObject(new GetTreeRequestServiceData("/", 0))));
                 msgSentOnMqtt.Wait(TimeSpan.FromSeconds(2));
             }
             finally
@@ -2120,10 +2218,10 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
         [Ignore("TODO after SendRequest test passes")]
         public void Test_SendEvent_Mqtt_sendsAppMessageTo_MqttBroker()
         {
-            //var jsconvert = new JsonConverter();
+            //var jsconvert = new MessageConverter.Json.Newtonsoft.MessageConverter();
             //client.SendRequest(this.CreateRequestMessage());
 
-            //client.SendEvent(jsconvert.Deserialize<EventMessage>($"{{'cid':{1}, 'code':{RequestCodes.Event}, 'data':{{'/identifier':0}}"));
+            //client.SendEvent(jsconvert.Deserialize<EventMessage>($"{{'cid':{1}, 'code':{RequestCodes.Event}, 'profileData':{{'/identifier':0}}"));
         }
 
         private void MqttServerNetAdapterOnEventReceived(object sender, EventMessageEventArgs e)
@@ -2133,7 +2231,7 @@ namespace ifmIoTCore.NetAdapter.Mqtt.UnitTests
 
         private void MqttServerNetAdapterOnRequestReceived(object sender, RequestMessageEventArgs e)
         {
-            e.Response = this._iotCore.HandleRequest(e.Request);
+            e.ResponseMessage = this._iotCore.HandleRequest(e.RequestMessage);
         }
 
     }

@@ -1,6 +1,6 @@
 ﻿namespace ifmIoTCore.Elements.ServiceData.Responses
 {
-    using Newtonsoft.Json;
+    using Common.Variant;
 
     /// <summary>
     /// Represents the outgoing data for a Subscribe service call
@@ -10,8 +10,16 @@
         /// <summary>
         /// The id which identifies the subscription
         /// </summary>
-        [JsonProperty("subscribeid", Required = Required.Always)]
-        public readonly int SubscriptionId;
+        [VariantProperty("subscribeid", Required = true)]
+        public int SubscriptionId { get; set; }
+
+        /// <summary>
+        /// The parameterless constructor for the variant converter
+        /// </summary>
+        [VariantConstructor]
+        public SubscribeResponseServiceData()
+        {
+        }
 
         /// <summary>
         /// Initializes a new instance of the class

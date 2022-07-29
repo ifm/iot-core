@@ -2,6 +2,7 @@
 {
     using System;
     using ifmIoTCore;
+    using ifmIoTCore.Elements;
     using ifmIoTCore.Elements.EventArguments;
 
     internal class Program
@@ -13,20 +14,17 @@
                 var ioTCore = IoTCoreFactory.Create("MyIoTCore");
 
                 // Register treechanged event handler
-                ioTCore.TreeChanged += HandleTreeChangedEvent;
+                ioTCore.Root.TreeChanged += HandleTreeChangedEvent;
 
                 // Create an element and do not raise a treechanged event
-                var struct1 = ioTCore.CreateStructureElement(ioTCore.Root, 
-                    "struct1");
+                var struct1 = new StructureElement("struct1");
+                ioTCore.Root.AddChild(struct1);
 
                 // Raise a treechanged event on demand
-                ioTCore.RaiseTreeChanged(ioTCore.Root, 
-                    struct1, 
-                    TreeChangedAction.ElementAdded);
+                ioTCore.Root.RaiseTreeChanged(struct1, TreeChangedAction.ElementAdded);
 
                 // Remove an element and raise a treechanged event
-                ioTCore.RemoveElement(ioTCore.Root, 
-                    struct1);
+                ioTCore.Root.RemoveChild(struct1, true);
             }
             catch (Exception e)
             {

@@ -1,6 +1,6 @@
 ﻿namespace ifmIoTCore.Elements.ServiceData.Requests
 {
-    using Newtonsoft.Json;
+    using Common.Variant;
 
     /// <summary>
     /// Represents the incoming data for a IDeviceElement.QueryTree service call
@@ -10,38 +10,47 @@
         /// <summary>
         /// The profile filter for the query
         /// </summary>
-        [JsonProperty("profile", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public readonly string Profile;
+        [VariantProperty("profile", IgnoredIfNull = true)]
+        public string Profile { get; set; }
 
         /// <summary>
         /// The type filter for the query
         /// </summary>
-        [JsonProperty("type", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public readonly string Type;
+        [VariantProperty("type", IgnoredIfNull = true)]
+        public string Type { get; set; }
 
         /// <summary>
-        /// The name filter for the query
+        /// The identifier (name) filter for the query
         /// </summary>
-        [JsonProperty("name", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public readonly string Name;
+        [VariantProperty("identifier", IgnoredIfNull = true, AlternativeNames = new []{"name"})]
+        public string Identifier { get; set; }
 
         /// <summary>
         /// The link filter for the query
         /// </summary>
-        [JsonProperty("link", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public readonly bool? Link;
+        [VariantProperty("link", IgnoredIfNull = true)]
+        public bool? Link { get; set; }
+
+        /// <summary>
+        /// The parameterless constructor for the variant converter
+        /// </summary>
+        [VariantConstructor]
+        public QueryTreeRequestServiceData()
+        {
+        }
 
         /// <summary>
         /// Initializes a new instance of the class
         /// </summary>
         /// <param name="profile">The profile filter</param>
         /// <param name="type">The type filter</param>
-        /// <param name="name">The name filter</param>
-        public QueryTreeRequestServiceData(string profile = null, string type = null, string name = null, bool? link = null)
+        /// <param name="identifier">The name filter</param>
+        /// <param name="link">The link filter</param>
+        public QueryTreeRequestServiceData(string profile = null, string type = null, string identifier = null, bool? link = null)
         {
             Profile = profile;
             Type = type;
-            Name = name;
+            Identifier = identifier;
             Link = link;
         }
     }

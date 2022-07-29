@@ -1,6 +1,6 @@
 ﻿namespace ifmIoTCore.Configuration
 {
-    using Utilities;
+    using DataStore;
 
     public class Settings
     {
@@ -11,8 +11,18 @@
             _dataStore = dataStore;
         }
 
-        public int ElementLockTimeout => _dataStore.GetValue("IoTCore", "ElementLockTimeout")?.ToObject<int>() ?? 3000;
+        public int ElementLockTimeout
+        {
+            get
+            {
+                if (_dataStore != null && int.TryParse(_dataStore.GetValue("IoTCore", "ElementLockTimeout"), out var value))
+                {
+                    return value;
+                }
+                return Timeout;
+            }
+        }
 
-        public const int Timeout = 3000;
+        public const int Timeout = 30000;
     }
 }

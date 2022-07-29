@@ -1,11 +1,7 @@
 ﻿namespace ifmIoTCore.Profiles.IoTCoreManagement.ServiceData.Requests
 {
-    using System;
     using System.Collections.Generic;
-    using Exceptions;
-    using Messages;
-    using Newtonsoft.Json;
-    using Newtonsoft.Json.Linq;
+    using Common.Variant;
 
     /// <summary>
     /// Represents the incoming data for a IDeviceElement.AddProfile service call
@@ -15,20 +11,25 @@
         /// <summary>
         /// The list of element addresses, that specify the elements to which the specified profiles are added
         /// </summary>
-        [JsonProperty("adrlist", Required = Required.Always)]
-        public readonly List<string> Addresses;
+        [VariantProperty("adrlist", Required = true)]
+        public List<string> Addresses { get; set; }
 
         /// <summary>
         /// The list of profiles to add
         /// </summary>
-        [JsonProperty("profiles", Required = Required.Always)]
-        public readonly List<string> Profiles;
+        [VariantProperty("profiles", Required = true)]
+        public List<string> Profiles { get; set; }
 
         /// <summary>
         /// true, if the request is persisted; otherwise false. false is default
         /// </summary>
-        [JsonProperty("persist", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public readonly bool Persist;
+        [VariantProperty("persist", Required = false)]
+        public bool Persist { get; set; }
+
+        [VariantConstructor]
+        public AddProfileRequestServiceData()
+        {
+        }
 
         /// <summary>
         /// Initializes a new instance of the class
@@ -41,23 +42,6 @@
             Addresses = addresses;
             Profiles = profiles;
             Persist = persist;
-        }
-
-        /// <summary>
-        /// Creates a new instance of the class from a json object
-        /// </summary>
-        /// <param name="json">The json object which is converted</param>
-        /// <returns>The new instance of the class</returns>
-        public static AddProfileRequestServiceData FromJson(JToken json)
-        {
-            try
-            {
-                return json.ToObject<AddProfileRequestServiceData>();
-            }
-            catch (Exception e)
-            {
-                throw new ServiceException(ResponseCodes.DataInvalid, e.Message);
-            }
         }
     }
 }

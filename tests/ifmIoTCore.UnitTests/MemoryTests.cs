@@ -25,7 +25,7 @@
         {
             var isolator = new Action(() =>
             {
-                new BaseElement(null, "type", "id");
+                new BaseElement("type", "id");
             });
 
             isolator();
@@ -44,27 +44,32 @@
         {
             var isolator = new Action(() =>
             {
-                using var ioTCore = IoTCoreFactory.Create("id0", null);
+                using var ioTCore = IoTCoreFactory.Create("id0");
 
-                var baseElement = ioTCore.CreateStructureElement(ioTCore.Root, "id");
+                var baseElement = new StructureElement("id");
+                ioTCore.Root.AddChild(baseElement);
 
                 for (var i = 0; i < 100; i++)
                 {
-                    var structureElement = ioTCore.CreateStructureElement(baseElement, $"struct{i}");
+                    var structureElement = new StructureElement($"struct{i}");
+                    baseElement.AddChild(structureElement);
                     
                     for (var j = 0; j < 100; j++)
                     {
-                        var dataElement = ioTCore.CreateDataElement<int>(structureElement, $"data{j}", null, null, false);
+                        var dataElement = new DataElement<int>($"data{j}");
+                        structureElement.AddChild(dataElement);
                     }
 
                     for (var j = 0; j < 100; j++)
                     {
-                        var eventElement = ioTCore.CreateEventElement(structureElement, $"event{j}");
+                        var eventElement = new EventElement($"event{j}");
+                        structureElement.AddChild(eventElement);
                     }
 
                     for (var j = 0; j < 100; j++)
                     {
-                        var serviceElement = ioTCore.CreateServiceElement<int, int>(structureElement, $"service{j}", null);
+                        var serviceElement = new ServiceElement($"service{j}", null );
+                        structureElement.AddChild(serviceElement);
                     }
                 }
             });
@@ -85,27 +90,32 @@
         {
             var isolator = new Action(() =>
             {
-                using var ioTCore = IoTCoreFactory.Create("id0", null);
+                using var ioTCore = IoTCoreFactory.Create("id0");
 
-                var baseElement = ioTCore.CreateStructureElement(ioTCore.Root, "id");
+                var baseElement = new StructureElement("id");
+                ioTCore.Root.AddChild(baseElement);
 
                 for (var i = 0; i < 100; i++)
                 {
-                    var structureElement = ioTCore.CreateStructureElement(baseElement, $"struct{i}");
-                    
+                    var structureElement = new StructureElement($"struct{i}");
+                    baseElement.AddChild(structureElement);
+
                     for (var j = 0; j < 100; j++)
                     {
-                        var dataElement = ioTCore.CreateDataElement<int>(structureElement, $"data{j}", null, null, false);
+                        var dataElement = new DataElement<int>($"data{j}");
+                        structureElement.AddChild(dataElement);
                     }
 
                     for (var j = 0; j < 100; j++)
                     {
-                        var eventElement = ioTCore.CreateEventElement(structureElement, $"event{j}");
+                        var eventElement = new EventElement($"event{j}");
+                        structureElement.AddChild(eventElement);
                     }
 
                     for (var j = 0; j < 100; j++)
                     {
-                        var serviceElement = ioTCore.CreateServiceElement<int, int>(structureElement, $"service{j}", null);
+                        var serviceElement = new ServiceElement($"service{j}", null);
+                        structureElement.AddChild(serviceElement);
                     }
                 }
             });
@@ -140,7 +150,7 @@
 
             dotMemory.Check(memory =>
             {
-                Assert.That(memory.GetObjects(where => where.Type.Is<IoTCore>()).ObjectsCount, Is.EqualTo(0));
+                Assert.That(memory.GetObjects(where => where.Type.Is<IIoTCore>()).ObjectsCount, Is.EqualTo(0));
             });
         }
 
@@ -150,31 +160,35 @@
         {
             if (!dotMemoryApi.IsEnabled) return;
 
-            using var ioTCore = IoTCoreFactory.Create("id", null);
-
             var snapShot = dotMemoryApi.GetSnapshot();
             var count1 = snapShot.GetObjects(where => where.Interface.Is(typeof(IBaseElement))).ObjectsCount;
             TestContext.WriteLine($"count1 = {count1}");
 
             var isolator = new Action(() =>
             {
+                using var ioTCore = IoTCoreFactory.Create("id");
+
                 for (var i = 0; i < 100; i++)
                 {
-                    var structureElement = ioTCore.CreateStructureElement(ioTCore.Root, $"struct{i}");
+                    var structureElement = new StructureElement($"struct{i}");
+                    ioTCore.Root.AddChild(structureElement);
 
                     for (var j = 0; j < 100; j++)
                     {
-                        var dataElement = ioTCore.CreateDataElement<int>(structureElement, $"data{j}");
+                        var dataElement = new DataElement<int>($"data{j}");
+                        structureElement.AddChild(dataElement);
                     }
 
                     for (var j = 0; j < 100; j++)
                     {
-                        var eventElement = ioTCore.CreateEventElement(structureElement, $"event{j}");
+                        var eventElement = new EventElement($"event{j}");
+                        structureElement.AddChild(eventElement);
                     }
 
                     for (var j = 0; j < 100; j++)
                     {
-                        var serviceElement = ioTCore.CreateServiceElement<int, int>(structureElement, $"service{j}", null);
+                        var serviceElement = new ServiceElement($"service{j}", null );
+                        structureElement.AddChild(serviceElement);
                     }
                 }
 
@@ -185,7 +199,7 @@
                 for (var i = 0; i < 100; i++)
                 {
                     var structureElement = ioTCore.Root.GetElementByIdentifier($"struct{i}");
-                    ioTCore.RemoveElement(ioTCore.Root, structureElement);
+                    ioTCore.Root.RemoveChild(structureElement);
                 }
             });
 
@@ -209,25 +223,29 @@
         {
             var isolator = new Action(() =>
             {
-                using var ioTCore = IoTCoreFactory.Create("id", null);
+                using var ioTCore = IoTCoreFactory.Create("id");
 
                 for (var i = 0; i < 100; i++)
                 {
-                    var structureElement = ioTCore.CreateStructureElement(ioTCore.Root, $"struct{i}");
+                    var structureElement = new StructureElement($"struct{i}");
+                    ioTCore.Root.AddChild(structureElement);
 
                     for (var j = 0; j < 100; j++)
                     {
-                        var dataElement = ioTCore.CreateDataElement<int>(structureElement, $"data{j}");
+                        var dataElement = new DataElement<int>($"data{j}");
+                        structureElement.AddChild(dataElement);
                     }
 
                     for (var j = 0; j < 100; j++)
                     {
-                        var eventElement = ioTCore.CreateEventElement(structureElement, $"event{j}");
+                        var eventElement = new EventElement($"event{j}");
+                        structureElement.AddChild(eventElement);
                     }
 
                     for (var j = 0; j < 100; j++)
                     {
-                        var serviceElement = ioTCore.CreateServiceElement<int, int>(structureElement, $"service{j}", null);
+                        var serviceElement = new ServiceElement($"service{j}",  null );
+                        structureElement.AddChild(serviceElement);
                     }
                 }
             });
@@ -243,7 +261,7 @@
 
             dotMemory.Check(memory =>
             {
-                Assert.That(memory.GetObjects(where => where.Type.Is<IoTCore>()).ObjectsCount, Is.EqualTo(0));
+                Assert.That(memory.GetObjects(where => where.Type.Is<IIoTCore>()).ObjectsCount, Is.EqualTo(0));
             });
         }
     }

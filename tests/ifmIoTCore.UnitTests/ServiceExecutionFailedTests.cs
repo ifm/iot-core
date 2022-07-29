@@ -1,8 +1,10 @@
 ﻿using System;
+using ifmIoTCore.Common.Variant;
 
 namespace ifmIoTCore.UnitTests
 {
     using Exceptions;
+    using ifmIoTCore.Elements;
     using Messages;
     using Newtonsoft.Json.Linq;
     using NUnit.Framework;
@@ -11,61 +13,57 @@ namespace ifmIoTCore.UnitTests
     public class ServiceExecutionFailedTests
     {
         [Test]
-        public void IoTCoreErrorResponseTest()
+        public void IoTCoreErrorResponseTest_HasDataMessage()
         {
-            using var ioTCore = IoTCoreFactory.Create("id0", null);
+            using var ioTCore = IoTCoreFactory.Create("id0");
 
             var response = ioTCore.HandleRequest(0, "/non_existing_service", null);
+            Assert.NotNull(response.Code, "response should contain code.");
 
-            var jobject = JObject.FromObject(response);
-
-            Assert.That(jobject.ContainsKey("code"));
-            Assert.That(((JObject)jobject["data"]).ContainsKey("msg"));
+            Assert.That(response.Data.AsVariantObject().ContainsKey("msg"), "responseData should contain msg tag.");
         }
 
         [Test]
-        public void ServiceErrorResponseTest()
+        public void ServiceErrorResponseTest_InternalError()
         {
-            using var ioTCore = IoTCoreFactory.Create("id0", null);
+            using var ioTCore = IoTCoreFactory.Create("id0");
 
-            ioTCore.CreateActionServiceElement(ioTCore.Root, "failing", (element, i) =>
+            ioTCore.Root.AddChild(new ActionServiceElement("failing", (element, i) =>
             {
                 throw new Exception("Service Failed");
-            });
+            }), true);
 
             var response = ioTCore.HandleRequest(0, "/failing", null);
 
-            Assert.AreEqual(500, response.Code);
+            Assert.AreEqual(ResponseCodes.InternalError, response.Code);
 
-            var jobject = JObject.FromObject(response);
-
-            Assert.That(jobject.ContainsKey("code"));
-            Assert.That(((JObject)jobject["data"]).ContainsKey("msg"));
+            Assert.NotNull(response.Code);
+            Assert.That(response.Data.AsVariantObject().ContainsKey("msg"));
         }
 
         [Test]
-        [Ignore("New error handling concept will be implemented in IoTCore 2.0")]
-        public void ServiceErrorResponseTest2()
+        public void ServiceErrorResponseTest_ServiceExecutionFailed_withInternalErrorcodeAndMessage()
         {
-            using var ioTCore = IoTCoreFactory.Create("id0", null);
+            using var ioTCore = IoTCoreFactory.Create("id0");
 
             var errorMessage = "Cannot make coffee. Please empty water tank.";
 
-            ioTCore.CreateActionServiceElement(ioTCore.Root, "failing", (element, i) =>
+            ioTCore.Root.AddChild(new ActionServiceElement("failing", (element, i) =>
             {
-                throw new ServiceException(10032, errorMessage);
-            });
+                throw new IoTCoreException(ResponseCodes.ExecutionFailed, errorMessage, 10032);
+            }), true);
 
             var response = ioTCore.HandleRequest(0, "/failing", null);
 
             Assert.AreEqual(ResponseCodes.ExecutionFailed, response.Code);
 
-            var jobject = JObject.FromObject(response);
+            Assert.NotNull(response.Code);
+            Assert.That(response.Data.AsVariantObject().ContainsKey("msg"));
+            Assert.That(response.Data.AsVariantObject().ContainsKey("code"));
 
-            Assert.That(jobject.ContainsKey("code"));
-            Assert.That(((JObject)jobject["data"]).ContainsKey("msg"));
-            Assert.That(((JObject)jobject["data"]).ContainsKey("error"));
-            Assert.AreEqual("10032", jobject["data"]["error"].ToString());
+            Assert.AreEqual("10032", (string)response.Data.AsVariantObject()["code"].AsVariantValue());
+
+        
         }
     }
 }

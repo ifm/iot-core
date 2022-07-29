@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net5.0;net6.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <Langversion>10</Langversion>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.1.0" />
+    <PackageReference Include="NUnit" Version="3.13.3" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.2.1" />
+    <PackageReference Include="NUnit.Analyzers" Version="3.3.0" />
+    <PackageReference Include="coverlet.collector" Version="3.1.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\source\ifmIoTCore.MessageConverter.Json.Microsoft\ifmIoTCore.MessageConverter.Json.Microsoft.csproj" />
+    <ProjectReference Include="..\..\source\ifmIoTCore.NetAdapter.WebSocket\ifmIoTCore.NetAdapter.WebSocket.csproj" />
+    <ProjectReference Include="..\..\source\ifmIoTCore\ifmIoTCore.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,10 +1,10 @@
 ﻿namespace ifmIoTCore.Utilities
 {
     using System;
-    using Elements;
+    using Common;
+    using Common.Variant;
     using Exceptions;
     using Messages;
-    using Newtonsoft.Json.Linq;
 
     public static class Helpers
     {
@@ -24,7 +24,7 @@
 
             // In this version the address starts with "/"
             return string.IsNullOrEmpty(parentAddress) ? 
-                RootAddress : 
+                $"{RootAddress}{identifier}" : 
                 parentAddress.EndsWith(AddressSeparator) ? 
                     $"{parentAddress}{identifier}" : 
                     $"{parentAddress}/{identifier}";
@@ -43,7 +43,7 @@
 
             // In this version the address starts with "/"
             return string.IsNullOrEmpty(parentAddress) ?
-                RootAddress :
+                $"{RootAddress}{string.Join(AddressSeparator.ToString(), identifiers)}" :
                 parentAddress.EndsWith(AddressSeparator) ?
                     $"{parentAddress}{string.Join(AddressSeparator.ToString(), identifiers)}" :
                     $"{parentAddress}/{string.Join(AddressSeparator.ToString(), identifiers)}";
@@ -80,23 +80,28 @@
             return true;
         }
 
-        public static T FromJson<T>(JToken json)
+        public static T VariantToObject<T>(Variant data)
         {
-            T data;
             try
             {
-                data = json != null ? json.ToObject<T>() : default;
+                return data != null ? Variant.ToObject<T>(data) : default;
             }
             catch (Exception e)
             {
                 throw new IoTCoreException(ResponseCodes.DataInvalid, e.Message);
             }
-            return data;
         }
 
-        public static JToken ToJson<T>(T data)
+        public static Variant VariantFromObject<T>(T data)
         {
-            return data != null ? JToken.FromObject(data) : null;
+            try
+            {
+                return data != null ? Variant.FromObject(data) : null;
+            }
+            catch (Exception e)
+            {
+                throw new IoTCoreException(ResponseCodes.DataInvalid, e.Message);
+            }
         }
     }
 }

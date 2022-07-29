@@ -1,4 +1,9 @@
-﻿namespace ifmIoTCore.UnitTests
+﻿using ifmIoTCore.Common.Variant;
+using ifmIoTCore.Elements.ServiceData.Responses;
+using ifmIoTCore.MessageConverter.Json.Newtonsoft;
+using Newtonsoft.Json.Bson.Converters;
+
+namespace ifmIoTCore.UnitTests
 {
     using System.Collections.Generic;
     using System.Linq;
@@ -14,33 +19,67 @@
     [Parallelizable(ParallelScope.None)]
     public class Services_gettree_Tests
     {
+        [Test, Property("TestCaseKey", "IOTCS-T44")]
+        public void gettree_expands_const_value_profile_DataElements()
+        { // this test assumes basic gettree functionality works
+            // Given: iot core instance, 2 dataelements, one of them with const_value profile, with specific value
+            using var testiotcore = IoTCoreFactory.Create("ioTCore");
+            const int AnswerOfEverything = 42;
+            string dataelement_const_value_profile = System.Guid.NewGuid().ToString("N");
+            testiotcore.Root.AddChild(new DataElement<int>(dataelement_const_value_profile, 
+                value: AnswerOfEverything, profiles: new List<string>() {"const_value"}), true);
+
+            string dataelement_const_value_not = System.Guid.NewGuid().ToString("N");
+            testiotcore.Root.AddChild(new DataElement<int>(dataelement_const_value_not, 
+                value: AnswerOfEverything+1, profiles: new List<string>() {"const_value_not"}), true);
+
+            // When: gettree service is called
+            var gettreeResponse = testiotcore.HandleRequest(0, "/gettree", data: new VariantObject()
+            {
+                {
+                    "expand_const_values", new VariantValue(true)
+                }
+            });
+
+            // Then: gettree json has only one element having 'value' field
+            Assert.That(gettreeResponse.Data.ToJToken().SelectTokens("$..value").Count(), Is.EqualTo(1), "expected search to return exactly single value element");
+            // Then: the specific dataelement having const_value has the specific value
+            string query_elementHavingValue = $"$..[?(@.identifier == '{dataelement_const_value_profile}')]";
+            Assert.AreEqual(gettreeResponse.Data.ToJToken().SelectToken(query_elementHavingValue)?.Value<int>("value"), AnswerOfEverything);
+        }
+
         [Test, Property("TestCaseKey", "IOTCS-T90")]
         public void gettree_ExtraParameter_adr_level_together_workAsExpected()
         { // this test assumes basic gettree functionality works
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
             IBaseElement nextRoot = ioTCore.Root;
             for (var i = 0; i < 20; i++)
             {
-                var child = ioTCore.CreateStructureElement(nextRoot, string.Format("struct{0}", i));
+                var child = new StructureElement(string.Format("struct{0}", i));
+                nextRoot.AddChild(child, true);
                 nextRoot = child;
             }
-            var gettreeResponse = ioTCore.HandleRequest(0, "/gettree", JToken.Parse("{'adr':'/struct0/struct1/struct2/struct3/struct4/struct5/struct6/struct7/struct8/struct9/struct10', 'level':5}"));
+
+            
+
+            var gettreeResponse = ioTCore.HandleRequest(0, "/gettree", new VariantObject() { { "adr", new VariantValue("/struct0/struct1/struct2/struct3/struct4/struct5/struct6/struct7/struct8/struct9/struct10") }, { "level", new VariantValue(5) }, });
             Assert.AreEqual(ResponseCodes.Success, gettreeResponse.Code); Assert.AreEqual(200, ResponseCodes.Success);
-            Assert.AreEqual(gettreeResponse.Data.SelectToken("$.type")?.ToObject<string>(), "structure");
-            Assert.AreEqual(gettreeResponse.Data.SelectToken("$.identifier")?.ToObject<string>(), "struct10");
-            Assert.IsNotNull(gettreeResponse.Data.SelectToken("$..[?(@.identifier==" + string.Format("'struct{0}'",10+5) + ")]"));
-            Assert.IsNull(gettreeResponse.Data.SelectToken("$..[?(@.identifier==" + string.Format("'struct{0}'",10+5+1) + ")]"));
+            Assert.AreEqual(gettreeResponse.Data.ToJToken().SelectToken("$.type")?.ToObject<string>(), "structure");
+            Assert.AreEqual(gettreeResponse.Data.ToJToken().SelectToken("$.identifier")?.ToObject<string>(), "struct10");
+            Assert.IsNotNull(gettreeResponse.Data.ToJToken().SelectToken("$..[?(@.identifier==" + string.Format("'struct{0}'",10+5) + ")]"));
+            Assert.IsNull(gettreeResponse.Data.ToJToken().SelectToken("$..[?(@.identifier==" + string.Format("'struct{0}'",10+5+1) + ")]"));
         }
 
 
         [Test, Property("TestCaseKey", "IOTCS-T90")]
         public void gettree_ExtraParameter_level_1to100_ListsSubElements()
         { // this test assumes basic gettree functionality works
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
             IBaseElement nextRoot = ioTCore.Root;
             for (var i = 1; i <= 100; i++)
             {
-                var child = ioTCore.CreateStructureElement(nextRoot, string.Format("struct{0}", i));
+                var child = new StructureElement(string.Format("struct{0}", i));
+                nextRoot.AddChild(child, true);
                 nextRoot = child;
             }
             Assert.Multiple(() =>
@@ -48,10 +87,10 @@
                 for (var i = 1; i <= 100; i++)
                 {
                     var gettreeResponse = ioTCore.HandleRequest(0, "/gettree", 
-                        JToken.Parse("{" + string.Format("'level' : {0}",i) + "}"));
+                        VariantConverter.FromJToken(JToken.Parse("{" + string.Format("'level' : {0}", i) + "}")));
                     Assert.AreEqual(ResponseCodes.Success, gettreeResponse.Code); Assert.AreEqual(200, ResponseCodes.Success);
-                    Assert.IsNotNull(gettreeResponse.Data.SelectToken("$..[?(@.identifier==" + string.Format("'struct{0}'",i) + ")]"));
-                    Assert.IsNull(gettreeResponse.Data.SelectToken("$..[?(@.identifier==" + string.Format("'struct{0}'",i+1) + ")]"));
+                    Assert.IsNotNull(gettreeResponse.Data.ToJToken().SelectToken("$..[?(@.identifier==" + string.Format("'struct{0}'",i) + ")]"));
+                    Assert.IsNull(gettreeResponse.Data.ToJToken().SelectToken("$..[?(@.identifier==" + string.Format("'struct{0}'",i+1) + ")]"));
                 }
             }); 
         }
@@ -60,72 +99,74 @@
         //[Ignore("TODO when query clarified")]
         public void gettree_ExtraParameter_level_negative_Ignored()
         { // this test assumes basic gettree functionality works
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            ioTCore.CreateStructureElement(ioTCore.Root, "struct1");
-            var gettreeResponse = ioTCore.HandleRequest(0, "/gettree", JToken.Parse("{'level': -1}"));
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+            ioTCore.Root.AddChild(new StructureElement("struct1"), true);
+            var gettreeResponse = ioTCore.HandleRequest(0, "/gettree", VariantConverter.FromJToken(JToken.Parse("{'level': -1}")));
             Assert.AreEqual(ResponseCodes.Success, gettreeResponse.Code); Assert.AreEqual(200, ResponseCodes.Success);
-            Assert.AreEqual(gettreeResponse.Data.SelectToken("$.identifier")?.ToObject<string>(), "ioTCore");
-            Assert.IsNull(gettreeResponse.Data.SelectToken("$.subs"), "Not expecting subs and its contents");
+            Assert.AreEqual(gettreeResponse.Data.ToJToken().SelectToken("$.identifier")?.ToObject<string>(), "ioTCore");
+            Assert.IsNull(gettreeResponse.Data.ToJToken().SelectToken("$.subs"), "Not expecting subs and its contents");
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T90")]
         //[Ignore("TODO when query clarified")]
         public void gettree_ExtraParameter_level_null_givesAllLevels()
         { // this test assumes basic gettree functionality works
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
             IBaseElement nextRoot = ioTCore.Root;
             for (var i = 1; i <= 100; i++)
             {
-                var child = ioTCore.CreateStructureElement(nextRoot, string.Format("struct{0}", i));
+                var child = new StructureElement(string.Format("struct{0}", i));
+                nextRoot.AddChild(child, true);
                 nextRoot = child;
             }
-            var gettreeResponse = ioTCore.HandleRequest(0, "/gettree", JToken.Parse("{'level': null}"));
+            var gettreeResponse = ioTCore.HandleRequest(0, "/gettree", VariantConverter.FromJToken(JToken.Parse("{'level': null}")));
             Assert.AreEqual(ResponseCodes.Success, gettreeResponse.Code); Assert.AreEqual(200, ResponseCodes.Success);
-            Assert.AreEqual(gettreeResponse.Data.SelectToken("$.type").ToObject<string>(), "device");
-            Assert.AreEqual(gettreeResponse.Data.SelectToken("$.identifier").ToObject<string>(), "ioTCore");
-            Assert.IsNotNull(gettreeResponse.Data.SelectToken("$.subs"), "Expecting subs and its contents");
-            Assert.IsNotNull(gettreeResponse.Data.SelectToken("$..[?(@.identifier==" + string.Format("'struct{0}'",100) + ")]"));
-            Assert.IsNull(gettreeResponse.Data.SelectToken("$..[?(@.identifier==" + string.Format("'struct{0}'",100+1) + ")]"));
+            Assert.AreEqual(gettreeResponse.Data.ToJToken().SelectToken("$.type").ToObject<string>(), "device");
+            Assert.AreEqual(gettreeResponse.Data.ToJToken().SelectToken("$.identifier").ToObject<string>(), "ioTCore");
+            Assert.IsNotNull(gettreeResponse.Data.ToJToken().SelectToken("$.subs"), "Expecting subs and its contents");
+            Assert.IsNotNull(gettreeResponse.Data.ToJToken().SelectToken("$..[?(@.identifier==" + string.Format("'struct{0}'",100) + ")]"));
+            Assert.IsNull(gettreeResponse.Data.ToJToken().SelectToken("$..[?(@.identifier==" + string.Format("'struct{0}'",100+1) + ")]"));
         }
 
 
         [Test, Property("TestCaseKey", "IOTCS-T90")]
         public void gettree_ExtraParameter_level_0_NoSubElements()
         { // this test assumes basic gettree functionality works
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            ioTCore.CreateStructureElement(ioTCore.Root, "struct1");
-            var gettreeResponse = ioTCore.HandleRequest(0, "/gettree", JToken.Parse("{'level': 0}"));
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+            ioTCore.Root.AddChild(new StructureElement("struct1"), true);
+            var gettreeResponse = ioTCore.HandleRequest(0, "/gettree", VariantConverter.FromJToken(JToken.Parse("{'level': 0}")));
             Assert.AreEqual(ResponseCodes.Success, gettreeResponse.Code); Assert.AreEqual(200, ResponseCodes.Success);
-            Assert.AreEqual(gettreeResponse.Data.SelectToken("$.identifier")?.ToObject<string>(), "ioTCore");
-            Assert.IsNull(gettreeResponse.Data.SelectToken("$.subs"), "Not expecting subs and its contents");
+            Assert.AreEqual(gettreeResponse.Data.ToJToken().SelectToken("$.identifier")?.ToObject<string>(), "ioTCore");
+            Assert.IsNull(gettreeResponse.Data.ToJToken().SelectToken("$.subs"), "Not expecting subs and its contents");
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T90")]
         public void gettree_ExtraParameter_adr_valid_startsFrom_specifiedElement()
         { // this test assumes basic gettree functionality works
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
             IBaseElement nextRoot = ioTCore.Root;
             for (var i = 0; i < 20; i++)
             {
-                var child = ioTCore.CreateStructureElement(nextRoot, string.Format("struct{0}", i));
+                var child = new StructureElement(string.Format("struct{0}", i));
+                nextRoot.AddChild(child, true);
                 nextRoot = child;
             }
-            var gettreeResponse = ioTCore.HandleRequest(0, "/gettree", JToken.Parse("{'adr':'/struct0/struct1/struct2/struct3/struct4/struct5/struct6/struct7/struct8/struct9/struct10'}"));
+            var gettreeResponse = ioTCore.HandleRequest(0, "/gettree", VariantConverter.FromJToken(JToken.Parse("{'adr':'/struct0/struct1/struct2/struct3/struct4/struct5/struct6/struct7/struct8/struct9/struct10'}")));
             Assert.AreEqual(ResponseCodes.Success, gettreeResponse.Code); Assert.AreEqual(200, ResponseCodes.Success);
-            Assert.AreEqual(gettreeResponse.Data.SelectToken("$.type")?.ToObject<string>(), "structure");
-            Assert.AreEqual(gettreeResponse.Data.SelectToken("$.identifier")?.ToObject<string>(), "struct10");
+            Assert.AreEqual(gettreeResponse.Data.ToJToken().SelectToken("$.type")?.ToObject<string>(), "structure");
+            Assert.AreEqual(gettreeResponse.Data.ToJToken().SelectToken("$.identifier")?.ToObject<string>(), "struct10");
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T90")]
         public void gettree_ExtraParameter_adr_null_startsFrom_RootDevice()
         { // this test assumes basic gettree functionality works
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            var gettreeResponse = ioTCore.HandleRequest(0, "/gettree", JToken.Parse("{'adr':null}"));
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+            var gettreeResponse = ioTCore.HandleRequest(0, "/gettree", VariantConverter.FromJToken(JToken.Parse("{'adr':null}")));
             Assert.AreEqual(200, ResponseCodes.Success);
             Assert.AreEqual(ResponseCodes.Success, gettreeResponse.Code);
-            Assert.IsNotNull(gettreeResponse.Data.SelectToken("$.type"));
-            Assert.AreEqual(gettreeResponse.Data.SelectToken("$.type").ToObject<string>(), "device");
-            Assert.AreEqual(gettreeResponse.Data.SelectToken("$.identifier").ToObject<string>(), "ioTCore");
+            Assert.IsNotNull(gettreeResponse.Data.ToJToken().SelectToken("$.type"));
+            Assert.AreEqual(gettreeResponse.Data.ToJToken().SelectToken("$.type").ToObject<string>(), "device");
+            Assert.AreEqual(gettreeResponse.Data.ToJToken().SelectToken("$.identifier").ToObject<string>(), "ioTCore");
         }
 
         readonly List<string> MandatoryParameters = new List<string> { "identifier", "type" };
@@ -133,10 +174,10 @@
         [Test, Property("TestCaseKey", "IOTCS-T89")]
         public void gettree_Response_RootDeviceElement_HasMandatoryParameters()
         { // Note: "subs" parameter is implicitly checked
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
             var gettreeResponse = ioTCore.HandleRequest(0, "/gettree").Data;
-            Assert.IsTrue(ParametersFound_RecurseSubs(gettreeResponse, MandatoryParameters));
-            Assert.IsTrue(ParametersFound_RecurseSubs( gettreeResponse.SelectToken("$.subs"), ChildElements_MandatoryParameters));
+            Assert.IsTrue(ParametersFound_RecurseSubs(VariantConverter.ToJToken(gettreeResponse), MandatoryParameters));
+            Assert.IsTrue(ParametersFound_RecurseSubs( gettreeResponse.ToJToken().SelectToken("$.subs"), ChildElements_MandatoryParameters));
         }
 
         internal bool ParametersFound_RecurseSubs(JToken elementToken, List<string> childnames )
@@ -169,13 +210,13 @@
         public void gettree_Response_StructureElement_HasRequiredMembers()
         { // pre-condition: ensure these tests pass: AddChildElement , StructureElement creation 
             // like structure element, all child elements of root device have these parameters: identifier, type and adr
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            ioTCore.CreateStructureElement(ioTCore.Root, "struct1");
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+            ioTCore.Root.AddChild(new StructureElement("struct1"), true);
             var gettreeResponse = ioTCore.HandleRequest(0,"/gettree").Data;
             var identifier_jpath_query = string.Format(
                 "$.subs[?(@.identifier == '{0}' && @.type == '{1}' && @.adr == '/{0}')]",
                 "struct1", "structure");
-            var SearchElement = gettreeResponse.SelectTokens(identifier_jpath_query).FirstOrDefault();
+            var SearchElement = gettreeResponse.ToJToken().SelectTokens(identifier_jpath_query).FirstOrDefault();
             Assert.NotNull(SearchElement, string.Format("Failed to find element {0}", identifier_jpath_query));
         }
 
@@ -183,13 +224,13 @@
         public void gettree_Response_ServiceElement_HasRequiredMembers()
         { // pre-condition: ensure these tests pass: AddChildElement , ServiceElement creation 
             // like structure element, all child elements of root device have these parameters: identifier, type and adr
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            ioTCore.CreateActionServiceElement(ioTCore.Root, "myservice", null);
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+            ioTCore.Root.AddChild(new ActionServiceElement("myservice", null), true);
             var gettreeResponse = ioTCore.HandleRequest(0, "/gettree").Data;
             var identifier_jpath_query = string.Format(
                 "$.subs[?(@.identifier == '{0}' && @.type == '{1}' && @.adr == '/{0}')]",
                 "myservice", "service");
-            var SearchElement = gettreeResponse.SelectTokens(identifier_jpath_query).FirstOrDefault();
+            var SearchElement = gettreeResponse.ToJToken().SelectTokens(identifier_jpath_query).FirstOrDefault();
             Assert.NotNull(SearchElement, string.Format("Failed to find element {0}", identifier_jpath_query));
         }
 
@@ -197,16 +238,16 @@
         public void gettree_Response_ServiceElementFull_HasRequiredMembers()
         { // pre-condition: ensure these tests pass: AddChildElement , ServiceElement creation 
             // like structure element, all child elements of root device have these parameters: identifier, type and adr
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            ioTCore.CreateActionServiceElement(ioTCore.Root, "myserviceFull", null, 
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+            ioTCore.Root.AddChild(new ActionServiceElement("myserviceFull", null,  
                     new Format(type:"serviceFormat",encoding:"utf-8", valuation:null, ns: null),
                     new List<string>(),
-                    "uid_myserviceFull_123");
+                    "uid_myserviceFull_123"), true);
             var gettreeResponse = ioTCore.HandleRequest(0, "/gettree").Data;
             var identifier_jpath_query = string.Format(
                 "$.subs[?(@.identifier == '{0}' && @.type == '{1}' && @.adr == '/{0}')]",
                 "myserviceFull", "service");
-            var SearchElement = gettreeResponse.SelectTokens(identifier_jpath_query).FirstOrDefault();
+            var SearchElement = gettreeResponse.ToJToken().SelectTokens(identifier_jpath_query).FirstOrDefault();
             Assert.NotNull(SearchElement, string.Format("Failed to find element {0}", identifier_jpath_query));
             // Extended checks on specific element type
             Assert.NotNull(SearchElement.SelectToken("$..[?(@.profiles)]"));
@@ -220,15 +261,14 @@
         public void gettree_Response_DataElement_HasRequiredMembers()
         { // pre-condition: ensure these tests pass: AddChildElement , ServiceElement creation 
             // like structure element, all child elements of root device have these parameters: identifier, type and adr
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            ioTCore.CreateDataElement<object>(ioTCore.Root,
-                "mydata_minimal", 
-                    format: new IntegerFormat(new IntegerValuation(int.MinValue, int.MaxValue, null, 0)));
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+            ioTCore.Root.AddChild(new DataElement<object>("mydata_minimal", 
+                    format: new IntegerFormat(new IntegerValuation(int.MinValue, int.MaxValue, null, 0))), true);
             var gettreeResponse = ioTCore.HandleRequest(0, "/gettree").Data;
             var identifier_jpath_query = string.Format(
                 "$.subs[?(@.identifier == '{0}' && @.type == '{1}' && @.adr == '/{0}')]",
                 "mydata_minimal", "data");
-            var SearchElement = gettreeResponse.SelectTokens(identifier_jpath_query).FirstOrDefault();
+            var SearchElement = gettreeResponse.ToJToken().SelectTokens(identifier_jpath_query).FirstOrDefault();
             Assert.NotNull(SearchElement, string.Format("Failed to find element {0}", identifier_jpath_query));
             // Extended checks on specific element type
             Assert.NotNull(SearchElement.SelectToken("$.format..[?(@.type == 'number')]"));
@@ -242,23 +282,22 @@
         public void gettree_Response_DataElementFull_HasRequiredMembers()
         { // pre-condition: ensure these tests pass: AddChildElement , ServiceElement creation 
             // like structure element, all child elements of root device have these parameters: identifier, type and adr
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
 
             var intField = new Field("intField1", new IntegerFormat(new IntegerValuation(-100, 100)));
             var floatField = new Field("floatField1", new FloatFormat(new FloatValuation(-100.0f, 100.0f, 3)), optional:true);
             var stringField = new Field("stringField1", new StringFormat(new StringValuation(10, 10, "dd-mm-yyyy")));
             var objectDataFormat = new ObjectFormat(new ObjectValuation(new List<Field> { intField, floatField, stringField }));
 
-            ioTCore.CreateDataElement<object>(ioTCore.Root,
-                "mydataFull", 
+            ioTCore.Root.AddChild(new DataElement<object>("mydataFull", 
                     format: objectDataFormat,
                     profiles: new List<string>(),
-                    uid: "uid_mydataFull_123");
+                    uid: "uid_mydataFull_123"), true);
             var gettreeResponse = ioTCore.HandleRequest(0, "/gettree").Data;
             var identifier_jpath_query = string.Format(
                 "$.subs[?(@.identifier == '{0}' && @.type == '{1}' && @.adr == '/{0}')]",
                 "mydataFull", "data");
-            var SearchElement = gettreeResponse.SelectTokens(identifier_jpath_query).FirstOrDefault();
+            var SearchElement = gettreeResponse.ToJToken().SelectTokens(identifier_jpath_query).FirstOrDefault();
             Assert.NotNull(SearchElement, string.Format("Failed to find element {0}", identifier_jpath_query));
             // Extended checks on specific element type
             Assert.NotNull(SearchElement.SelectToken("$..[?(@.profiles)]"));
@@ -278,17 +317,17 @@
         public void gettree_Response_EventElement_HasRequiredMembers()
         { // pre-condition: ensure these tests pass: AddChildElement , ServiceElement creation 
             // like structure element, all child elements of root device have these parameters: identifier, type and adr
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            var myevent = ioTCore.CreateEventElement(ioTCore.Root, "myevent_minimal");
-            ioTCore.CreateActionServiceElement(myevent, 
-                Identifiers.TriggerEvent,
-                (s, cid) => { myevent.RaiseEvent(); });
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+            var myevent = new EventElement("myevent_minimal");
+            ioTCore.Root.AddChild(myevent, true); 
+            myevent.AddChild(new ActionServiceElement(Identifiers.TriggerEvent,
+                (s, cid) => { myevent.RaiseEvent(); }), true);
 
             var gettreeResponse = ioTCore.HandleRequest(0, "/gettree").Data;
             var identifier_jpath_query = string.Format(
                 "$.subs[?(@.identifier == '{0}' && @.type == '{1}' && @.adr == '/{0}')]",
                 "myevent_minimal", "event");
-            var SearchElement = gettreeResponse.SelectTokens(identifier_jpath_query).FirstOrDefault();
+            var SearchElement = gettreeResponse.ToJToken().SelectTokens(identifier_jpath_query).FirstOrDefault();
             Assert.NotNull(SearchElement, string.Format("Failed to find element {0}", identifier_jpath_query));
             // Extended checks on specific element type
             Assert.IsTrue(ParametersFound_RecurseSubs(SearchElement, ChildElements_MandatoryParameters));
@@ -301,22 +340,21 @@
         public void gettree_Response_EventElementFull_HasRequiredMembers()
         { // pre-condition: ensure these tests pass: AddChildElement , ServiceElement creation 
             // like structure element, all child elements of root device have these parameters: identifier, type and adr
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            var myevent = ioTCore.CreateEventElement(ioTCore.Root,
-                "myeventFull",
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+            var myevent = new EventElement("myeventFull",
                 format: null,
                 profiles: new List<string>(),
                 uid: "uid_myeventFull_123");
-            ioTCore.CreateActionServiceElement(myevent, 
-                Identifiers.TriggerEvent,
-                (s, cid) => { myevent.RaiseEvent(); });
+            ioTCore.Root.AddChild(myevent, true);
+            myevent.AddChild(new ActionServiceElement(Identifiers.TriggerEvent,
+                (s, cid) => { myevent.RaiseEvent(); }), true);
 
 
             var gettreeResponse = ioTCore.HandleRequest(0, "/gettree").Data;
             var identifier_jpath_query = string.Format(
                 "$.subs[?(@.identifier == '{0}' && @.type == '{1}' && @.adr == '/{0}')]",
                 "myeventFull", "event");
-            var SearchElement = gettreeResponse.SelectTokens(identifier_jpath_query).FirstOrDefault();
+            var SearchElement = gettreeResponse.ToJToken().SelectTokens(identifier_jpath_query).FirstOrDefault();
             Assert.NotNull(SearchElement, string.Format("Failed to find element {0}", identifier_jpath_query));
             // Extended checks on specific element type
             Assert.IsTrue(ParametersFound_RecurseSubs(SearchElement, ChildElements_MandatoryParameters));
@@ -331,13 +369,13 @@
         public void gettree_Response_HiddenElementIsNotShown_ServiceElement()
         { // pre-condition: ensure these tests pass: AddChildElement , ServiceElement creation 
             // like structure element, all child elements of root device have these parameters: identifier, type and adr
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            ioTCore.CreateActionServiceElement(ioTCore.Root, "myservice_hidden", null, isHidden: true);
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+            ioTCore.Root.AddChild(new ActionServiceElement("myservice_hidden", null,  isHidden: true), true);
             var gettreeResponse = ioTCore.HandleRequest(0, "/gettree").Data;
             var identifier_jpath_query = string.Format(
                 "$.subs[?(@.identifier == '{0}' && @.type == '{1}' && @.adr == '/{0}')]",
                 "myservice_hidden", "service");
-            var SearchElement = gettreeResponse.SelectTokens(identifier_jpath_query).FirstOrDefault();
+            var SearchElement = gettreeResponse.ToJToken().SelectTokens(identifier_jpath_query).FirstOrDefault();
             Assert.Null(SearchElement, string.Format("found element unexpectedly {0}", identifier_jpath_query));
         }
 
@@ -362,14 +400,14 @@
         [Test, Property("TestCaseKey", "IOTCS-T53")]
         public void gettree_Response_DeviceElementSubs_HasStandardElements()
         { // pre-condition: ensure these tests pass: AddChildElement , DeviceElement, IoTCore creation 
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
             var gettreeResponse = ioTCore.HandleRequest(0, "/gettree").Data;
             foreach (var serviceElement in DeviceElementSubs_services)
             { 
                 var identifier_jpath_query = string.Format(
                     "$.subs[?(@.identifier == '{0}' && @.type == '{1}' && @.adr == '/{0}')]",
                     serviceElement, "service");
-                var SearchElement = gettreeResponse.SelectTokens(identifier_jpath_query).FirstOrDefault();
+                var SearchElement = gettreeResponse.ToJToken().SelectTokens(identifier_jpath_query).FirstOrDefault();
                 Assert.NotNull(SearchElement, string.Format("Failed to find element {0}", identifier_jpath_query));
             }
             foreach (var eventElement in DeviceElementSubs_events)
@@ -377,7 +415,7 @@
                 var identifier_jpath_query = string.Format(
                     "$.subs[?(@.identifier == '{0}' && @.type == '{1}' && @.adr == '/{0}')]",
                     eventElement, "event");
-                var SearchElement = gettreeResponse.SelectTokens(identifier_jpath_query).FirstOrDefault();
+                var SearchElement = gettreeResponse.ToJToken().SelectTokens(identifier_jpath_query).FirstOrDefault();
                 Assert.NotNull(SearchElement, string.Format("Failed to find element {0}", identifier_jpath_query));
             }
             

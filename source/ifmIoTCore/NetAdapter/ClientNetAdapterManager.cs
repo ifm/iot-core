@@ -1,63 +1,69 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using ifmIoTCore.Exceptions;
-using ifmIoTCore.Messages;
-using ifmIoTCore.Resources;
-
-namespace ifmIoTCore.NetAdapter
+﻿namespace ifmIoTCore.NetAdapter
 {
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
+    using Exceptions;
+    using Messages;
+    using Resources;
+
     public class ClientNetAdapterManager : IClientNetAdapterManager
     {
         private readonly List<IClientNetAdapterFactory> _clientNetAdapterFactories = new List<IClientNetAdapterFactory>();
-        public IEnumerable<IClientNetAdapterFactory> ClientNetAdapterFactories => _clientNetAdapterFactories;
 
-        /// <summary>
-        /// Lock object to synchronize <seealso cref="CreateClientNetAdapter"/> calls.
-        /// </summary>
-        /// <remarks>lock(this) is not used, because this here is the IoTCore instance. When locking on the iotcore occures in other places, this could lead to a deadlock.</remarks>
-        private readonly object _netAdapterManagerLock = new object(); 
+        public IEnumerable<IClientNetAdapterFactory> ClientNetAdapterFactories
+        {
+            get
+            {
+                lock (_clientNetAdapterFactories)
+                {
+                    return new List<IClientNetAdapterFactory>(_clientNetAdapterFactories);
+                }
+            }
+        }
 
         public void RegisterClientNetAdapterFactory(IClientNetAdapterFactory clientNetAdapterFactory)
         {
-            if (clientNetAdapterFactory == null)
-            {
-                throw new IoTCoreException(ResponseCodes.DataInvalid, string.Format(Resource1.ArgumentNullOrEmpty, nameof(clientNetAdapterFactory)));
-            }
+            if (clientNetAdapterFactory == null) throw new ArgumentNullException(nameof(clientNetAdapterFactory));
 
-            if (_clientNetAdapterFactories.FirstOrDefault(x => x.Protocol == clientNetAdapterFactory.Protocol) == null)
+            lock (_clientNetAdapterFactories)
             {
-                _clientNetAdapterFactories.Add(clientNetAdapterFactory);
+                if (_clientNetAdapterFactories.FirstOrDefault(x => x.Scheme == clientNetAdapterFactory.Scheme) == null)
+                {
+                    _clientNetAdapterFactories.Add(clientNetAdapterFactory);
+                }
             }
         }
 
         public void RemoveClientNetAdapterFactory(IClientNetAdapterFactory clientNetAdapterFactory)
         {
-            clientNetAdapterFactory?.Dispose();
-            _clientNetAdapterFactories.Remove(clientNetAdapterFactory);
+            if (clientNetAdapterFactory == null) throw new ArgumentNullException(nameof(clientNetAdapterFactory));
+
+            lock (_clientNetAdapterFactories)
+            {
+                _clientNetAdapterFactories.Remove(clientNetAdapterFactory);
+                clientNetAdapterFactory.Dispose();
+            }
         }
 
-        public IClientNetAdapter CreateClientNetAdapter(Uri remoteUri)
+        public IClientNetAdapter CreateClientNetAdapter(Uri targetUri)
         {
-            if (remoteUri == null)
-            {
-                throw new IoTCoreException(ResponseCodes.DataInvalid, string.Format(Resource1.ArgumentNullOrEmpty, nameof(remoteUri)));
-            }
+            if (targetUri == null) throw new ArgumentNullException(nameof(targetUri));
 
-            lock(_netAdapterManagerLock)
+            lock (_clientNetAdapterFactories)
             {
-                var clientFactory = _clientNetAdapterFactories.FirstOrDefault(x => x.Protocol == remoteUri.Scheme);
+                var clientFactory = _clientNetAdapterFactories.FirstOrDefault(x => x.Scheme == targetUri.Scheme);
                 if (clientFactory == null)
                 {
-                    throw new IoTCoreException(ResponseCodes.NotFound, string.Format(Resource1.ClientFactoryNotFound, remoteUri.Scheme));
+                    throw new IoTCoreException(ResponseCodes.NotFound, string.Format(Resource1.ClientFactoryNotFound, targetUri.Scheme));
                 }
-                return clientFactory.CreateClient(remoteUri);
+                return clientFactory.CreateClient(targetUri);
             }
         }
 
         public void Dispose()
         {
-            if (_clientNetAdapterFactories != null)
+            lock (_clientNetAdapterFactories)
             {
                 foreach (var item in _clientNetAdapterFactories)
                 {
@@ -66,6 +72,5 @@ namespace ifmIoTCore.NetAdapter
                 _clientNetAdapterFactories.Clear();
             }
         }
-        
     }
 }

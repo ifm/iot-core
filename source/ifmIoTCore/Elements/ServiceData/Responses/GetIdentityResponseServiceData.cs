@@ -1,7 +1,7 @@
 ﻿namespace ifmIoTCore.Elements.ServiceData.Responses
 {
     using System.Collections.Generic;
-    using Newtonsoft.Json;
+    using Common.Variant;
 
     /// <summary>
     /// Represents the outgoing data for a IDeviceElement.GetIdentity service call
@@ -16,20 +16,28 @@
             /// <summary>
             /// The serial number of the device
             /// </summary>
-            [JsonProperty("serialnumber", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-            public readonly string SerialNumber;
+            [VariantProperty("serialnumber", IgnoredIfNull = true)]
+            public string SerialNumber { get; set; }
 
             /// <summary>
             /// The hardware revision of the device
             /// </summary>
-            [JsonProperty("hwrevision", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-            public readonly string HardwareRevision;
+            [VariantProperty("hwrevision", IgnoredIfNull = true)]
+            public string HardwareRevision { get; set; }
 
             /// <summary>
             /// The software revision of the device
             /// </summary>
-            [JsonProperty("swrevision", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-            public readonly string SoftwareRevision;
+            [VariantProperty("swrevision", IgnoredIfNull = true)]
+            public string SoftwareRevision { get; set; }
+
+            /// <summary>
+            /// The parameterless constructor for the variant converter
+            /// </summary>
+            [VariantConstructor]
+            public DeviceInfo()
+            {
+            }
 
             /// <summary>
             /// Initializes a new instance of the class
@@ -50,14 +58,22 @@
             /// <summary>
             /// The name of the catalogue
             /// </summary>
-            [JsonProperty("name", Required = Required.Always)]
-            public readonly string Name;
+            [VariantProperty("name", Required = true)]
+            public string Name { get; set; }
 
             /// <summary>
             /// The version of the catalogue
             /// </summary>
-            [JsonProperty("version", Required = Required.Always)]
-            public readonly string Version;
+            [VariantProperty("version", Required = true)]
+            public string Version { get; set; }
+
+            /// <summary>
+            /// The parameterless constructor for the variant converter
+            /// </summary>
+            [VariantConstructor]
+            public CatalogInfo()
+            {
+            }
 
             /// <summary>
             /// Initializes a new instance of the class
@@ -80,20 +96,28 @@
             /// <summary>
             /// The type of the server
             /// </summary>
-            [JsonProperty("type", Required = Required.Always)]
-            public readonly string Type;
+            [VariantProperty("type", Required = true)]
+            public string Type { get; set; }
 
             /// <summary>
             /// The endpoint of the server
             /// </summary>
-            [JsonProperty("uri", Required = Required.Always)]
-            public readonly string Uri;
+            [VariantProperty("uri", Required = true)]
+            public string Uri { get; set; }
 
             /// <summary>
             /// The list of supported data formats of the server
             /// </summary>
-            [JsonProperty("formats", Required = Required.Always)]
-            public readonly List<string> Formats;
+            [VariantProperty("formats", Required = true)]
+            public List<string> Formats { get; set; }
+
+            /// <summary>
+            /// The parameterless constructor for the variant converter
+            /// </summary>
+            [VariantConstructor]
+            public ServerInfo()
+            {
+            }
 
             /// <summary>
             /// Initializes a new instance of the class
@@ -117,40 +141,48 @@
             /// <summary>
             /// The name of the IoTCore
             /// </summary>
-            [JsonProperty("name", Required = Required.Always)]
-            public readonly string Name;
+            [VariantProperty("name", Required = true)]
+            public string Name { get; set; }
 
             /// <summary>
             /// The version of the IoTCore
             /// </summary>
-            [JsonProperty("version", Required = Required.Always)]
-            public readonly string Version;
+            [VariantProperty("version", Required = true)]
+            public string Version { get; set; }
 
             // Ignore, because buggy in iolinkmaster and optional anyway
             // As discussed w/ Matthieu on 11-4-2021
             ///// <summary>
             ///// The list of available network adapter servers in the IoTCore
             ///// </summary>
-            //[JsonProperty("serverlist", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-            //public readonly List<ServerInfo> Servers;
+            //[VariantPropertyName("serverlist", IgnoredIfNull = true)]
+            //public List<ServerInfo> Servers { get; set; }
 
             /// <summary>
             /// The unique id of the IoTCore
             /// </summary>
-            [JsonProperty("uid", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-            public readonly string UId;
+            [VariantProperty("uid", IgnoredIfNull = true)]
+            public string UId { get; set; }
 
             /// <summary>
             /// The device class of the IoTCore
             /// </summary>
-            [JsonProperty("deviceclass", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-            public readonly string DeviceClass;
+            [VariantProperty("deviceclass", IgnoredIfNull = true)]
+            public string DeviceClass { get; set; }
 
             /// <summary>
             /// The supported catalogs of the IoTCore
             /// </summary>
-            [JsonProperty("catalogue", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-            public readonly List<CatalogInfo> Catalogs;
+            [VariantProperty("catalogue", IgnoredIfNull = true)]
+            public List<CatalogInfo> Catalogs { get; set; }
+
+            /// <summary>
+            /// The parameterless constructor for the variant converter
+            /// </summary>
+            [VariantConstructor]
+            public IoTInfo()
+            {
+            }
 
             /// <summary>
             /// Initializes a new instance of the class
@@ -180,26 +212,34 @@
             /// <summary>
             /// The security mode
             /// </summary>
-            [JsonProperty("securitymode", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-            public readonly string Mode;
+            [VariantProperty("securitymode", IgnoredIfNull = true)]
+            public string Mode { get; set; }
 
             /// <summary>
             /// The authentication scheme
             /// </summary>
-            [JsonProperty("authscheme", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-            public readonly string AuthenticationScheme;
+            [VariantProperty("authscheme", IgnoredIfNull = true)]
+            public string AuthenticationScheme { get; set; }
 
             /// <summary>
             /// If a password is set true; otherwise false
             /// </summary>
-            [JsonProperty("ispasswdset", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-            public readonly string IsPasswordSet;
+            [VariantProperty("ispasswdset", IgnoredIfNull = true)]
+            public string IsPasswordSet { get; set; }
 
             /// <summary>
             /// Describes which communication interface is currently used
             /// </summary>
-            [JsonProperty("activeconnection", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-            public readonly string ActiveConnection;
+            [VariantProperty("activeconnection", IgnoredIfNull = true)]
+            public string ActiveConnection { get; set; }
+
+            /// <summary>
+            /// The parameterless constructor for the variant converter
+            /// </summary>
+            [VariantConstructor]
+            public SecurityInfo()
+            {
+            }
 
             /// <summary>
             /// Initializes a new instance of the class
@@ -220,20 +260,28 @@
         /// <summary>
         /// The device identity
         /// </summary>
-        [JsonProperty("device", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public readonly DeviceInfo Device;
+        [VariantProperty("device", IgnoredIfNull = true)]
+        public DeviceInfo Device { get; set; }
 
         /// <summary>
         /// The IoT identity
         /// </summary>
-        [JsonProperty("iot", Required = Required.Always)]
-        public readonly IoTInfo IoT;
+        [VariantProperty("iot", Required = true)]
+        public IoTInfo IoT { get; set; }
 
         /// <summary>
         /// The security identity
         /// </summary>
-        [JsonProperty("security", Required = Required.Default, NullValueHandling = NullValueHandling.Include)]
-        public readonly SecurityInfo Security;
+        [VariantProperty("security", IgnoredIfNull = true)]
+        public SecurityInfo Security { get; set; }
+
+        /// <summary>
+        /// The parameterless constructor for the variant converter
+        /// </summary>
+        [VariantConstructor]
+        public GetIdentityResponseServiceData()
+        {
+        }
 
         /// <summary>
         /// Initializes a new instance of the class

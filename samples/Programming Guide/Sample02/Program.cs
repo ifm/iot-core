@@ -3,6 +3,7 @@
     using System;
     using System.Collections.Generic;
     using ifmIoTCore;
+    using ifmIoTCore.Elements;
 
     internal class Program
     {
@@ -11,11 +12,11 @@
             try
             {
                 var ioTCore = IoTCoreFactory.Create("MyIoTCore");
-
-                ioTCore.CreateStructureElement(ioTCore.Root, 
-                    "struct1", 
+                
+                var struct1 = new StructureElement("struct1", 
                     null, 
                     new List<string> { "profile1" });
+                ioTCore.Root.AddChild(struct1);
             }
             catch (Exception e)
             {

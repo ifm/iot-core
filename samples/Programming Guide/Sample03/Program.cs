@@ -1,9 +1,74 @@
 ﻿namespace Sample03
 {
     using System;
-    using System.Collections.Generic;
     using ifmIoTCore;
+    using ifmIoTCore.Common.Variant;
     using ifmIoTCore.Elements;
+
+    internal class Program
+    {
+        static void Main()
+        {
+            try
+            {
+                var ioTCore = IoTCoreFactory.Create("MyIoTCore");
+
+                var struct1 = new StructureElement("struct1");
+                ioTCore.Root.AddChild(struct1);
+
+                var service1 = new ActionServiceElement("service1", HandleService1);
+                struct1.AddChild(service1);
+
+                var service2 = new GetterServiceElement("service2", HandleService2);
+                struct1.AddChild(service2);
+
+                var service3 = new SetterServiceElement("service3", HandleService3);
+                struct1.AddChild(service3);
+
+                var service4 = new ServiceElement("service4", HandleService4);
+                struct1.AddChild(service4);
+
+                var service5 = new ServiceElement("service5", HandleService5);
+                struct1.AddChild(service5);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+            }
+            Console.ReadLine();
+        }
+
+        private static void HandleService1(IServiceElement element, int? cid)
+        {
+            Console.WriteLine("Do something");
+        }
+
+        private static Variant HandleService2(IServiceElement element, int? cid)
+        {
+            Console.WriteLine("Do something and return result");
+            return new VariantValue(0);
+        }
+
+        private static void HandleService3(IServiceElement element, Variant data, int? cid)
+        {
+            Console.WriteLine($"Do something with {(string)(VariantValue)data}");
+        }
+
+        private static Variant HandleService4(IServiceElement element, Variant data, int? cid)
+        {
+            Console.WriteLine($"Do something with {data} and return result");
+
+            var str = (string)(VariantValue)data;
+            return (VariantValue)$"Received {str}";
+        }
+
+        private static Variant HandleService5(IServiceElement element, Variant data, int? cid)
+        {
+            var value = Variant.ToObject<UserData>(data);
+            Console.WriteLine($"Do something with {value} and return result");
+            return Variant.FromObject(value);
+        }
+    }
 
     internal class UserData : IEquatable<UserData>
     {
@@ -29,73 +94,6 @@
         public override string ToString()
         {
             return $"Int1={Int1} Float1={Float1} String1={String1}";
-        }
-    }
-
-    internal class Program
-    {
-        static void Main()
-        {
-            try
-            {
-                var ioTCore = IoTCoreFactory.Create("MyIoTCore");
-
-                var struct1 = ioTCore.CreateStructureElement(ioTCore.Root, "struct1", null,
-                    new List<string> { "profile1" });
-
-                ioTCore.CreateActionServiceElement(struct1, 
-                    "service1", 
-                    HandleService1);
-
-                ioTCore.CreateGetterServiceElement<int>(struct1, 
-                    "service2", 
-                    HandleService2);
-
-                ioTCore.CreateSetterServiceElement<string>(struct1, 
-                    "service3", 
-                    HandleService3);
-
-                ioTCore.CreateServiceElement<int, string>(struct1, 
-                    "service4", 
-                    HandleService4);
-
-                ioTCore.CreateServiceElement<UserData, UserData>(struct1, 
-                    "service5", 
-                    HandleService5);
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.Message);
-            }
-            Console.ReadLine();
-        }
-
-        private static void HandleService1(IBaseElement element, int? cid)
-        {
-            Console.WriteLine("Do something");
-        }
-
-        private static int HandleService2(IBaseElement element, int? cid)
-        {
-            Console.WriteLine("Do something and return result");
-            return 0;
-        }
-
-        private static void HandleService3(IBaseElement element, string data, int? cid)
-        {
-            Console.WriteLine($"Do something with {data}");
-        }
-
-        private static string HandleService4(IBaseElement element, int data, int? cid)
-        {
-            Console.WriteLine($"Do something with {data} and return result");
-            return $"Received {data}";
-        }
-
-        private static UserData HandleService5(IBaseElement element, UserData data, int? cid)
-        {
-            Console.WriteLine($"Do something with {data} and return result");
-            return data;
         }
     }
 }

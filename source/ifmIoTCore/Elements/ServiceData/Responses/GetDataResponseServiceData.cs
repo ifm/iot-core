@@ -1,49 +1,30 @@
 ﻿namespace ifmIoTCore.Elements.ServiceData.Responses
 {
-    using Exceptions;
-    using Messages;
-    using Newtonsoft.Json;
-    using Newtonsoft.Json.Linq;
+    using Common.Variant;
 
-    /// <summary>
-    /// Represents the outgoing data for a GetData service call
-    /// </summary>
     public class GetDataResponseServiceData
     {
         /// <summary>
-        /// The value returned by the service
+        /// The value to get
         /// </summary>
-        [JsonProperty("value", Required = Required.Always)]
-        private readonly JToken _value;
+        [VariantProperty("value", Required = true)]
+        public Variant Value { get; set; }
 
         /// <summary>
-        /// Initializes a new instance of the class
+        /// The parameterless constructor for the variant converter
         /// </summary>
-        /// <param name="value">The value to set</param>
-        [JsonConstructor]
-        public GetDataResponseServiceData(JToken value)
+        [VariantConstructor]
+        public GetDataResponseServiceData()
         {
-            _value = value;
         }
 
         /// <summary>
         /// Initializes a new instance of the class
         /// </summary>
-        /// <param name="value">The value returned by the service</param>
-        public GetDataResponseServiceData(object value)
+        /// <param name="value">The value to get</param>
+        public GetDataResponseServiceData(Variant value)
         {
-            _value = value == null ? JValue.CreateNull() : JToken.FromObject(value);
-        }
-
-        /// <summary>
-        /// Gets the value
-        /// </summary>
-        /// <typeparam name="T">The data type of the value</typeparam>
-        /// <returns>The value</returns>
-        public T GetValue<T>()
-        {
-            if (_value == null) throw new IoTCoreException(ResponseCodes.BadRequest, "json is null");
-            return _value.ToObject<T>();
+            Value = value;
         }
     }
 }

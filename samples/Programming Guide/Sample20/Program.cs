@@ -2,26 +2,28 @@
 {
     using System;
     using ifmIoTCore;
+    using ifmIoTCore.MessageConverter.Json.Newtonsoft;
     using ifmIoTCore.NetAdapter.Http;
 
     internal class Program
     {
         static void Main()
         {
+            IIoTCore ioTCore = null;
             try
             {
-                var ioTCore = IoTCoreFactory.Create("MyIoTCore");
+                ioTCore = IoTCoreFactory.Create("MyIoTCore");
 
                 ioTCore.RegisterClientNetAdapterFactory(
                     new HttpClientNetAdapterFactory(
-                        new ifmIoTCore.Converter.Json.JsonConverter()));
+                        new MessageConverter()));
             }
             catch (Exception e)
             {
                 Console.WriteLine(e.Message);
             }
-
             Console.ReadLine();
+            ioTCore?.Dispose();
         }
     }
 }

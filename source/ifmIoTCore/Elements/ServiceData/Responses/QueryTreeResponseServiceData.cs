@@ -2,7 +2,7 @@
 {
     using System.Collections.Generic;
     using System.Linq;
-    using Newtonsoft.Json;
+    using Common.Variant;
 
     /// <summary>
     /// Represents the outgoing data for a IDeviceElement.QueryTree service call
@@ -12,8 +12,16 @@
         /// <summary>
         /// The list of addresses of the elements retrieved by the query
         /// </summary>
-        [JsonProperty("adrlist", Required = Required.Always)]
-        public readonly List<string> Addresses;
+        [VariantProperty("adrlist", Required = true)]
+        public List<string> Addresses { get; set; }
+
+        /// <summary>
+        /// The parameterless constructor for the variant converter
+        /// </summary>
+        [VariantConstructor]
+        public QueryTreeResponseServiceData()
+        {
+        }
 
         /// <summary>
         /// Initializes a new instance of the class

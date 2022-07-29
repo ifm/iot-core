@@ -3,6 +3,7 @@
     using System;
     using System.Collections.Generic;
     using ifmIoTCore;
+    using ifmIoTCore.Common.Variant;
     using ifmIoTCore.Elements;
     using ifmIoTCore.Elements.Formats;
     using ifmIoTCore.Elements.ServiceData.Events;
@@ -17,26 +18,24 @@
             {
                 var ioTCore = IoTCoreFactory.Create("MyIoTCore");
 
-                var struct1 = ioTCore.CreateStructureElement(ioTCore.Root, 
-                    "struct1");
+                var struct1 = new StructureElement("struct1");
+                ioTCore.Root.AddChild(struct1);
 
-                ioTCore.CreateSetterServiceElement<EventServiceData>(struct1, 
-                    "service1", 
-                    HandleService1);
+                var service1 = new SetterServiceElement("service1", HandleService1);
+                struct1.AddChild(service1);
 
-                var string1 = ioTCore.CreateDataElement<string>(struct1, 
-                    "string1", 
+                var string1 = new ReadOnlyDataElement<string>("string1", 
                     GetString1, 
-                    null, 
-                    true, 
-                    false,
                     format: new StringFormat(new StringValuation(0, 100)));
+                struct1.AddChild(string1);
 
-                var event1 = ioTCore.CreateEventElement(struct1, 
-                    "event1");
+                var event1 = new EventElement("event1");
+                struct1.AddChild(event1);
 
-                event1.Subscribe(new SubscribeRequestServiceData("/struct1/service1",
-                  new List<string> { string1.Address }));
+                var data = Variant.FromObject(
+                    new SubscribeRequestServiceData("/struct1/service1", 
+                        new List<string> { string1.Address }));
+                event1.SubscribeServiceElement.Invoke(data);
 
                 event1.RaiseEvent();
             }
@@ -54,18 +53,19 @@
         private static string _string1 = "Hallo";
 
         private static void HandleService1(IBaseElement element,
-            EventServiceData data, 
+            Variant data, 
             int? cid = null)
         {
             Console.WriteLine("HandleService1 called");
 
-            Console.WriteLine($"Event source={data.EventSource}");
-            Console.WriteLine($"Event number={data.EventNumber}");
-            foreach (var (key, value) in data.Payload)
+            var eventServiceData = Variant.ToObject<EventServiceData>(data);
+
+            Console.WriteLine($"Event source={eventServiceData.EventAddress}");
+            Console.WriteLine($"Event number={eventServiceData.EventNumber}");
+            foreach (var (key, value) in eventServiceData.Payload)
             {
-                Console.WriteLine($"{key}={value}");
+                Console.WriteLine($"{key}={value.Code},{value.Data}");
             }
         }
     }
 }
-

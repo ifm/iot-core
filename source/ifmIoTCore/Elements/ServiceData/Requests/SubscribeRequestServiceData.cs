@@ -1,7 +1,7 @@
 ﻿namespace ifmIoTCore.Elements.ServiceData.Requests
 {
     using System.Collections.Generic;
-    using Newtonsoft.Json;
+    using Common.Variant;
 
     /// <summary>
     /// Represents the incoming data for a IEventElement.Subscribe service call
@@ -9,28 +9,36 @@
     public class SubscribeRequestServiceData
     {
         /// <summary>
-        /// The url to which the IoTCore is sending events
+        /// The callback address of the subscription
         /// </summary>
-        [JsonProperty("callback", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public readonly string Callback;
+        [VariantProperty("callback", Required = true, AlternativeNames = new[] { "callbackurl" })]
+        public string Callback { get; set; }
 
         /// <summary>
         /// List of data element addresses, whose values are sent with the event
         /// </summary>
-        [JsonProperty("datatosend", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public readonly List<string> DataToSend;
+        [VariantProperty("datatosend", IgnoredIfNull = true)]
+        public List<string> DataToSend { get; set; }
 
         /// <summary>
         /// The id which identifies the subscription
         /// </summary>
-        [JsonProperty("subscribeid", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public int? SubscriptionId;
+        [VariantProperty("subscribeid", IgnoredIfNull = true)]
+        public int? SubscriptionId { get; set; }
 
         /// <summary>
         /// If true the subscription is persistent; otherwise not 
         /// </summary>
-        [JsonProperty("persist", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public readonly bool Persist;
+        [VariantProperty("persist", IgnoredIfNull = true)]
+        public bool Persist { get; set; }
+
+        /// <summary>
+        /// The parameterless constructor for the variant converter
+        /// </summary>
+        [VariantConstructor]
+        public SubscribeRequestServiceData()
+        {
+        }
 
         /// <summary>
         /// Initializes a new instance of the class

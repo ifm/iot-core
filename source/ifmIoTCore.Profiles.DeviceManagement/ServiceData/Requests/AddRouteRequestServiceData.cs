@@ -1,7 +1,7 @@
 ﻿namespace ifmIoTCore.Profiles.DeviceManagement.ServiceData.Requests
 {
+    using Common.Variant;
     using Messages;
-    using Newtonsoft.Json;
 
     /// <summary>
     /// Represents the incoming data for a AddRoute service call
@@ -11,26 +11,34 @@
         /// <summary>
         /// The url of the routed IoTCore
         /// </summary>
-        [JsonProperty("url", Required = Required.Always)]
-        public readonly string Uri;
+        [VariantProperty("uri", Required = true)]
+        public string Uri { get; set; }
 
         /// <summary>
         /// The identifier name for the routed IoTCore
         /// </summary>
-        [JsonProperty("identifier", Required = Required.Always)]
-        public readonly string Identifier;
+        [VariantProperty("identifier", Required = true)]
+        public string Identifier { get; set; }
 
         /// <summary>
         /// If true, the request is persisted; otherwise not. false is default
         /// </summary>
-        [JsonProperty("persist", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public readonly bool Persist;
+        [VariantProperty("persist", IgnoredIfNull = true)]
+        public bool Persist { get; set; }
 
         /// <summary>
         /// The authentication information
         /// </summary>
-        [JsonProperty("auth", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public readonly AuthenticationInfo Authentication;
+        [VariantProperty("auth", IgnoredIfNull = true)]
+        public AuthenticationInfo Authentication { get; set; }
+
+        /// <summary>
+        /// The parameterless constructor for the variant converter
+        /// </summary>
+        [VariantConstructor]
+        public AddRouteRequestServiceData()
+        {
+        }
 
         /// <summary>
         /// Initializes a new instance of the class

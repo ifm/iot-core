@@ -3,34 +3,56 @@
     using System;
     using System.Net;
     using System.Threading;
+    using System.Threading.Tasks;
+    using CommandLine;
     using ifmIoTCore;
-    using ifmIoTCore.Converter.Json;
+    using ifmIoTCore.Elements;
+    using ifmIoTCore.MessageConverter.Json.Newtonsoft;
     using ifmIoTCore.NetAdapter.Http;
     using ifmIoTCore.NetAdapter.Mqtt;
-    using ifmIoTCore.Utilities;
+    using ifmIoTCore.Profiles.Base;
+    using ifmIoTCore.Profiles.DeviceManagement;
 
     internal class Program
     {
         private static void Main(string[] args)
         {
-            var uri = new Uri("mqtt://127.0.0.1:1883");
+            Parser.Default.ParseArguments<CommandLineParameters>(args)
+                .WithParsed(o =>
+                {
+                    Run(o.MqttBrokerUrl, o.HttpUri);
+                });
+        }
 
-            var logger = new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Debug);
+        private static void Run(string mqttBrokerUrlArg, string httpUrlArg)
+        {
+            var mqttUrl = new Uri(mqttBrokerUrlArg);
+            var httpUrl = new Uri(httpUrlArg);
+
+            var file = AppDomain.CurrentDomain.SetupInformation.ConfigurationFile;
+
+            var logger = new ifmIoTCore.Logging.Log4Net.Logger(file, nameof(Program));
+            
 
             using (var manualResetEvent = new ManualResetEventSlim())
-            using (var iotCore = IoTCoreFactory.Create("id", logger))
-            using (var mqttServerNetAdapter = new MqttServerNetAdapter(iotCore, iotCore.Root, new JsonConverter(), new IPEndPoint(IPAddress.Parse(uri.Host), uri.Port)))
-            using (var httpServerNetAdapter = new HttpServerNetAdapter(iotCore, new Uri("http://127.0.0.1:8090"), new JsonConverter(), logger))
-            using (var mqttClientNetAdapterFactory = new MqttNetAdapterClientFactory(new JsonConverter()))
+            using (var iotCore = IoTCoreFactory.Create("id", null, logger))
+            using (var mqttServerNetAdapter = new MqttServerNetAdapter(iotCore, iotCore.Root, new MessageConverter(), new IPEndPoint(IPAddress.Parse(mqttUrl.Host), mqttUrl.Port)))
+            using (var httpServerNetAdapter = new HttpServerNetAdapter(iotCore, httpUrl, new MessageConverter(), logger))
+            using (var httpClientNetAdapterFactory = new HttpClientNetAdapterFactory(new MessageConverter()))
+            using (var mqttClientNetAdapterFactory = new MqttNetAdapterClientFactory(new MessageConverter()))
             {
-                iotCore.RegisterClientNetAdapterFactory(mqttClientNetAdapterFactory);
+                var deviceManagementProfileBuilder = new DeviceManagementProfileBuilder(new ProfileBuilderConfiguration(iotCore, null));
+                deviceManagementProfileBuilder.Build();
 
-                mqttServerNetAdapter.RequestMessageReceived += (s, e) =>
+                iotCore.RegisterClientNetAdapterFactory(mqttClientNetAdapterFactory);
+                iotCore.RegisterClientNetAdapterFactory(httpClientNetAdapterFactory);
+
+                mqttServerNetAdapter.RequestReceived += (s, e) =>
                 {
-                    e.Response = iotCore.HandleRequest(e.Request);
+                    e.ResponseMessage = iotCore.HandleRequest(e.RequestMessage);
                 };
 
-                mqttServerNetAdapter.EventMessageReceived += (s, e) =>
+                mqttServerNetAdapter.EventReceived += (s, e) =>
                 {
                     iotCore.HandleEvent(e.EventMessage);
                 };
@@ -38,21 +60,44 @@
                 iotCore.RegisterServerNetAdapter(mqttServerNetAdapter);
                 iotCore.RegisterServerNetAdapter(httpServerNetAdapter);
 
-                var eventElement = iotCore.CreateEventElement(iotCore.Root, "myEvent1", null, null, null, raiseTreeChanged: true);
+                int value = 0;
 
-                iotCore.CreateActionServiceElement(iotCore.Root, "raiseMyEvent1", (element, i) =>
+                var dataElement = new ReadOnlyDataElement<int>("data", element => ++value);
+                iotCore.Root.AddChild(dataElement);
+
+                var eventElement = new EventElement("myEvent1");
+                iotCore.Root.AddChild(eventElement, true);
+
+                var raiseMyEvent1= new ActionServiceElement("raiseMyEvent1", (element, i) =>
                 {
-                    // ReSharper disable once AccessToDisposedClosure
-                    eventElement.RaiseEvent();
+                    Task.Run(() =>
+                    {
+                        DateTime dateTime = DateTime.Now;
+                        while (DateTime.Now - dateTime < TimeSpan.FromSeconds(30))
+                        {
+                            eventElement.RaiseEvent();
+                        }
+                    }).ConfigureAwait(false);
                 });
 
-                iotCore.CreateActionServiceElement(iotCore.Root, "stop", (element, i) =>
+                iotCore.Root.AddChild(raiseMyEvent1);
+
+                var stopService = new ActionServiceElement("stop", (element, i) =>
                 {
                     // ReSharper disable once AccessToDisposedClosure
                     manualResetEvent.Set();
                 });
 
-                mqttServerNetAdapter.Start();
+                iotCore.Root.AddChild(stopService);
+
+                try
+                {
+                    mqttServerNetAdapter.Start();
+                }
+                catch
+                {
+                    
+                }
                 httpServerNetAdapter.Start();
 
                 manualResetEvent.Wait();
@@ -61,5 +106,14 @@
                 httpServerNetAdapter.Stop();
             }
         }
+    }
+
+    internal class CommandLineParameters
+    {
+        [Option( "mqtt-broker", Required = true, HelpText = "Url of the mqtt broker", Default = "mqtt://192.168.83.247:1883")]
+        public string MqttBrokerUrl { get; set; }
+
+        [Option('u', "http-uri", Required = true, HelpText = "Uri to start the http server", Default = "http://127.0.0.1:8001")]
+        public string HttpUri { get; set; }
     }
 }

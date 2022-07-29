@@ -1,7 +1,6 @@
 ﻿namespace Sample06
 {
     using System;
-    using System.Collections.Generic;
     using ifmIoTCore;
     using ifmIoTCore.Elements;
     using ifmIoTCore.Elements.Formats;
@@ -15,18 +14,15 @@
             {
                 var ioTCore = IoTCoreFactory.Create("MyIoTCore");
 
-                var struct1 = ioTCore.CreateStructureElement(ioTCore.Root, 
-                    "struct1", 
-                    null,
-                    new List<string> { "profile1" });
+                var struct1 = new StructureElement("struct1");
+                ioTCore.Root.AddChild(struct1);
 
-                ioTCore.CreateDataElement<int>(struct1, 
-                    "int1", 
+                var int1 = new DataElement<int>("int1",
                     GetInt1, 
-                    SetInt1, 
-                    true, 
-                    true, 
+                    SetInt1,
                     format: new IntegerFormat(new IntegerValuation(0, 100)));
+
+                struct1.AddChild(int1);
             }
             catch (Exception e)
             {
@@ -35,12 +31,12 @@
             Console.ReadLine();
         }
 
-        private static int GetInt1(IBaseElement element)
+        private static int GetInt1(IDataElement element)
         {
             return _int1;
         }
 
-        private static void SetInt1(IBaseElement element, int value)
+        private static void SetInt1(IDataElement element, int value)
         {
             _int1 = value;
         }

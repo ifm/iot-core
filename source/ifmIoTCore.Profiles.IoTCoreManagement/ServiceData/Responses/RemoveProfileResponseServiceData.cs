@@ -1,13 +1,32 @@
-﻿namespace ifmIoTCore.Profiles.IoTCoreManagement.ServiceData.Responses
+﻿using System;
+using ifmIoTCore.Common.Variant;
+
+namespace ifmIoTCore.Profiles.IoTCoreManagement.ServiceData.Responses
 {
     using System.Collections;
     using System.Collections.Generic;
-    using Newtonsoft.Json;
 
-    public class RemoveProfileResponseServiceData : IDictionary<string, List<ProfileRemoveResult>>
+    public class RemoveProfileResponseServiceData : IDictionary<string, List<ProfileRemoveResult>>, IDictionary
     {
         private readonly IDictionary<string, List<ProfileRemoveResult>> _dictionaryImplementation = new Dictionary<string, List<ProfileRemoveResult>>();
-        
+
+        public bool Contains(object key)
+        {
+            return ((IDictionary)_dictionaryImplementation).Contains(key);
+        }
+
+        IDictionaryEnumerator IDictionary.GetEnumerator()
+        {
+            return ((IDictionary)_dictionaryImplementation).GetEnumerator();
+        }
+
+        public void Remove(object key)
+        {
+            ((IDictionary)_dictionaryImplementation).Remove(key);
+        }
+
+        public bool IsFixedSize => ((IDictionary)_dictionaryImplementation).IsFixedSize;
+
         public IEnumerator<KeyValuePair<string, List<ProfileRemoveResult>>> GetEnumerator()
         {
             return _dictionaryImplementation.GetEnumerator();
@@ -21,6 +40,11 @@
         public void Add(KeyValuePair<string, List<ProfileRemoveResult>> item)
         {
             _dictionaryImplementation.Add(item);
+        }
+
+        public void Add(object key, object value)
+        {
+            ((IDictionary)_dictionaryImplementation).Add(key, value);
         }
 
         public void Clear()
@@ -43,9 +67,22 @@
             return _dictionaryImplementation.Remove(item);
         }
 
+        public void CopyTo(Array array, int index)
+        {
+            ((IDictionary)_dictionaryImplementation).CopyTo(array, index);
+        }
+
         public int Count => _dictionaryImplementation.Count;
+        public bool IsSynchronized => ((IDictionary)_dictionaryImplementation).IsSynchronized;
+
+        public object SyncRoot => ((IDictionary)_dictionaryImplementation).SyncRoot;
 
         public bool IsReadOnly => _dictionaryImplementation.IsReadOnly;
+        public object this[object key]
+        {
+            get => ((IDictionary)_dictionaryImplementation)[key];
+            set => ((IDictionary)_dictionaryImplementation)[key] = value;
+        }
 
         public void Add(string key, List<ProfileRemoveResult> value)
         {
@@ -74,20 +111,28 @@
         }
 
         public ICollection<string> Keys => _dictionaryImplementation.Keys;
+        ICollection IDictionary.Values => ((IDictionary)_dictionaryImplementation).Values;
+
+        ICollection IDictionary.Keys => ((IDictionary)_dictionaryImplementation).Keys;
 
         public ICollection<List<ProfileRemoveResult>> Values => _dictionaryImplementation.Values;
     }
 
     public class ProfileRemoveResult
     {
-        [JsonProperty("code", Required = Required.Always)]
-        public ProfileRemoveCode Code;
+        [ifmIoTCore.Common.Variant.VariantPropertyAttribute("code", Required = true)]
+        public ProfileRemoveCode Code { get; set; }
 
-        [JsonProperty("profile", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public string Profile;
+        [ifmIoTCore.Common.Variant.VariantPropertyAttribute("profile", Required = false)]
+        public string Profile { get; set; }
 
-        [JsonProperty("message", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public string Message;
+        [ifmIoTCore.Common.Variant.VariantPropertyAttribute("message", Required = false)]
+        public string Message { get; set; }
+
+        [VariantConstructor]
+        public ProfileRemoveResult()
+        {
+        }
 
         public ProfileRemoveResult(ProfileRemoveCode code, string profile = null, string message = null)
         {

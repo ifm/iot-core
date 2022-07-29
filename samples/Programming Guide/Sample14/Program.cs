@@ -1,42 +1,28 @@
 ﻿namespace Sample14
 {
     using System;
-    using System.Collections.Generic;
     using ifmIoTCore;
     using ifmIoTCore.Elements;
-    using ifmIoTCore.Utilities;
 
     internal class Program
     {
-        internal class UserData
-        {
-            public string String1;
-            public int Int1;
-            public float Float1;
-
-            public UserData()
-            {
-                String1 = "Hallo";
-                Int1 = 10;
-                Float1 = 1.2345f;
-            }
-        }
-
         static void Main()
         {
             try
             {
                 var ioTCore = IoTCoreFactory.Create("MyIoTCore");
 
-                var struct1 = ioTCore.CreateStructureElement(ioTCore.Root, 
-                    "struct1", 
-                    null,
-                    new List<string> { "profile1" });
+                var struct1 = new StructureElement("struct1");
+                ioTCore.Root.AddChild(struct1);
 
-                var service1 = ioTCore.CreateActionServiceElement(struct1, 
-                    "service1", 
-                    HandleService1);
-                service1.UserData = new UserData();
+                var service1 = new ActionServiceElement(
+                    "service1",
+                    HandleService1)
+                {
+                    UserData = new UserData()
+                };
+
+                struct1.AddChild(service1);
             }
             catch (Exception e)
             {
@@ -46,11 +32,29 @@
             Console.ReadLine();
         }
 
-        private static void HandleService1(IBaseElement element, int? cid)
+        private static void HandleService1(IServiceElement element, int? cid)
         {
             var userData = (UserData)element.UserData;
+            Console.WriteLine($"Do something with {userData}");
+        }
+    }
 
-            // Do something with user data
+    internal class UserData
+    {
+        public string String1;
+        public int Int1;
+        public float Float1;
+
+        public UserData()
+        {
+            String1 = "Hallo";
+            Int1 = 10;
+            Float1 = 1.2345f;
+        }
+
+        public override string ToString()
+        {
+            return $"Int1={Int1} Float1={Float1} String1={String1}";
         }
     }
 }

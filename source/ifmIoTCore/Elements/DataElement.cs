@@ -2,68 +2,64 @@
 {
     using System;
     using System.Collections.Generic;
+    using System.ComponentModel;
+    using System.Runtime.CompilerServices;
+    using Common.Variant;
     using Exceptions;
     using Formats;
     using Messages;
-    using Newtonsoft.Json.Linq;
     using Resources;
     using ServiceData.Requests;
     using ServiceData.Responses;
     using Utilities;
 
-    internal class DataElement<T> : BaseElement, IDataElement<T>
+    public class DataElementBase<T> : BaseElement, IDataElement
     {
-        private Func<IDataElement<T>, T> _getDataFunc;
-        private Action<IDataElement<T>, T> _setDataFunc;
-
         private T _value;
         private readonly TimeSpan? _cacheTimeout;
         private DateTime _cacheLastRefreshTime;
 
+        protected Func<IDataElement, T> GetDataFunc;
+        protected Action<IDataElement, T> SetDataFunc;
+
+        public IServiceElement GetDataServiceElement { get; }
+
+        public IServiceElement SetDataServiceElement { get; }
+
         public IEventElement DataChangedEventElement { get; set; }
 
-        public DataElement(IBaseElement parent,
-            string identifier,
-            Func<IDataElement<T>, T> getDataFunc = null,
-            Action<IDataElement<T>, T> setDataFunc = null,
+        protected DataElementBase(string identifier,
             bool createGetDataServiceElement = true,
+            Func<IDataElement, T> getDataFunc = null,
             bool createSetDataServiceElement = true,
+            Action<IDataElement, T> setDataFunc = null,
+            bool createDataChangedEventElement = false,
             T value = default,
             TimeSpan? cacheTimeout = null,
-            Format format = null, 
+            Format format = null,
             List<string> profiles = null,
             string uid = null,
-            bool isHidden = false,
-            object context = null) : 
-            base(parent, Identifiers.Data, identifier, format, profiles, uid, isHidden, context)
+            bool isHidden = false) :
+            base(Identifiers.Data, identifier, format, profiles, uid, isHidden)
         {
-            _getDataFunc = getDataFunc;
-            _setDataFunc = setDataFunc;
-
             _value = value;
             _cacheTimeout = cacheTimeout;
 
-            IGetterServiceElement<GetDataResponseServiceData> getDataServiceElement = null;
-            ISetterServiceElement<SetDataRequestServiceData> setDataServiceElement = null;
-
-            try
+            if (createGetDataServiceElement)
             {
-                if (createGetDataServiceElement)
-                {
-                    getDataServiceElement = CreateGetDataServiceElement();
-                }
-
-                if (createSetDataServiceElement)
-                {
-                    setDataServiceElement = CreateSetDataServiceElement();
-                }
+                GetDataFunc = getDataFunc;
+                AddChild(GetDataServiceElement = new GetterServiceElement(Identifiers.GetData, GetDataServiceFunc));
             }
-            catch
-            {
-                getDataServiceElement?.Dispose();
-                setDataServiceElement?.Dispose();
 
-                throw;
+            if (createSetDataServiceElement)
+            {
+                SetDataFunc = setDataFunc;
+                AddChild(SetDataServiceElement = new SetterServiceElement(Identifiers.SetData, SetDataServiceFunc));
+            }
+
+            if (createDataChangedEventElement)
+            {
+                AddChild(DataChangedEventElement = new EventElement(Identifiers.DataChanged));
             }
 
             if (Format == null)
@@ -73,7 +69,11 @@
                 {
                     Format = new BooleanFormat();
                 }
-                else if (type == typeof(int) || type == typeof(uint))
+                else if (type == typeof(char) || 
+                         type == typeof(sbyte) || type == typeof(byte) ||
+                         type == typeof(short) || type == typeof(ushort) ||
+                         type == typeof(int) || type == typeof(uint) ||
+                         type == typeof(long) || type == typeof(ulong))
                 {
                     Format = new IntegerFormat(null);
                 }
@@ -89,7 +89,11 @@
                 {
                     Format = new ArrayFormat(new Valuations.ArrayValuation(Format.Types.Boolean, new BooleanFormat()));
                 }
-                else if (type == typeof(int[]) || type == typeof(uint[]))
+                else if (type == typeof(char[]) || 
+                         type == typeof(sbyte[]) || type == typeof(byte[]) ||
+                         type == typeof(short[]) || type == typeof(ushort[]) ||
+                         type == typeof(int[]) || type == typeof(uint[]) ||
+                         type == typeof(long[]) || type == typeof(ulong[]))
                 {
                     Format = new ArrayFormat(new Valuations.ArrayValuation(Format.Types.Number, new IntegerFormat(null)));
                 }
@@ -104,86 +108,153 @@
             }
         }
 
-        protected IGetterServiceElement<GetDataResponseServiceData> CreateGetDataServiceElement()
+        private Variant GetDataServiceFunc(IServiceElement _, int? cid)
         {
-            var getDataServiceElement = new GetterServiceElement<GetDataResponseServiceData>(this, Identifiers.GetData, GetDataServiceFunc);
-            References.AddForwardReference(this, getDataServiceElement, getDataServiceElement.Identifier, ReferenceType.Child);
-            return getDataServiceElement;
+            var value = GetData();
+
+            return Helpers.VariantFromObject(new GetDataResponseServiceData(value));
         }
 
-        protected ISetterServiceElement<SetDataRequestServiceData> CreateSetDataServiceElement()
+        protected virtual Variant GetData()
         {
-            var setDataServiceElement = new SetterServiceElement<SetDataRequestServiceData>(this, Identifiers.SetData, SetDataServiceFunc);
-            References.AddForwardReference(this, setDataServiceElement, setDataServiceElement.Identifier, ReferenceType.Child);
-            return setDataServiceElement;
+            if (GetDataFunc != null)
+            {
+                if (_cacheTimeout == null || _cacheLastRefreshTime + _cacheTimeout < DateTime.UtcNow)
+                {
+                    var value = GetDataFunc(this);
+                    if (_value == null || !_value.Equals(value))
+                    {
+                        _value = value;
+                    }
+                    _cacheLastRefreshTime = DateTime.UtcNow;
+                }
+            }
+            return Helpers.VariantFromObject(_value);
         }
 
-        private GetDataResponseServiceData GetDataServiceFunc(IServiceElement _, int? cid)
+        private void SetDataServiceFunc(IServiceElement _, Variant data, int? cid)
         {
-            return new GetDataResponseServiceData(Value);
+            var value = Helpers.VariantToObject<SetDataRequestServiceData>(data).Value;
+
+            SetData(value);
         }
 
-        private void SetDataServiceFunc(IServiceElement _, SetDataRequestServiceData data, int? cid)
+        protected virtual void SetData(Variant data)
         {
             if (data == null)
             {
                 throw new IoTCoreException(ResponseCodes.BadRequest, string.Format(Resource1.ServiceDataEmpty, Identifiers.SetData));
             }
-            Value = data.GetValue<T>();
-        }
 
-        public T Value
-        {
-            get
+            var value = Helpers.VariantToObject<T>(data);
+            SetDataFunc?.Invoke(this, value);
+            if (_value == null || !_value.Equals(value))
             {
-                if (_getDataFunc != null)
-                {
-                    if (_cacheTimeout == null || _cacheLastRefreshTime + _cacheTimeout < DateTime.UtcNow)
-                    {
-                        var value = _getDataFunc(this);
-                        if (_value == null || !_value.Equals(value))
-                        {
-                            _value = value;
-
-                            // ToDo: Raise here or not, if getdata reads other value than stored?
-                            //RaiseDataChanged();
-                        }
-                        _cacheLastRefreshTime = DateTime.UtcNow;
-                    }
-                }
-                return _value;
-            }
-
-            set
-            {
-                _setDataFunc?.Invoke(this, value);
-                if (_value == null || !_value.Equals(value))
-                {
-                    _value = value;
-                    _cacheLastRefreshTime = DateTime.UtcNow;
-                    RaiseDataChanged();
-                }
+                _value = value;
+                _cacheLastRefreshTime = DateTime.UtcNow;
+                RaiseDataChanged();
             }
         }
 
-        JToken IDataElement.Value
+        public Variant Value
         {
-            get => Helpers.ToJson(Value);
-            set => Value = Helpers.FromJson<T>(value);
+            get => GetData();
+            set => SetData(value);
         }
 
         public void RaiseDataChanged()
         {
+            OnPropertyChanged();
             DataChangedEventElement?.RaiseEvent();
         }
 
-        protected override void Dispose(bool disposing)
-        {
-            _getDataFunc = null;
-            _setDataFunc = null;
-            DataChangedEventElement = null;
+        public event PropertyChangedEventHandler PropertyChanged;
 
-            base.Dispose(disposing);
+        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    public class ReadOnlyDataElement<T> : DataElementBase<T>
+    {
+        public ReadOnlyDataElement(string identifier,
+            Func<IDataElement, T> getDataFunc = null,
+            bool createDataChangedEventElement = false,
+            T value = default,
+            TimeSpan? cacheTimeout = null,
+            Format format = null,
+            List<string> profiles = null,
+            string uid = null,
+            bool isHidden = false) :
+            base(identifier, 
+                true,
+                getDataFunc,
+                false,
+                null,
+                createDataChangedEventElement,
+                value, 
+                cacheTimeout, 
+                format, profiles, uid, isHidden)
+        {
+        }
+
+        protected override void SetData(Variant value)
+        {
+            throw new IoTCoreException(ResponseCodes.NotImplemented, string.Format(Resource1.ServiceNotImplemented, Address));
+        }
+    }
+
+    public class WriteOnlyDataElement<T> : DataElementBase<T>
+    {
+        public WriteOnlyDataElement(string identifier,
+            Action<IDataElement, T> setDataFunc = null,
+            bool createDataChangedEventElement = false,
+            T value = default,
+            Format format = null,
+            List<string> profiles = null,
+            string uid = null,
+            bool isHidden = false) :
+            base(identifier,
+                false,
+                null,
+                true,
+                setDataFunc,
+                createDataChangedEventElement,
+                value,
+                null,
+                format, profiles, uid, isHidden)
+        {
+        }
+
+        protected override Variant GetData()
+        {
+            throw new IoTCoreException(ResponseCodes.NotImplemented, string.Format(Resource1.ServiceNotImplemented, Address));
+        }
+    }
+
+    public class DataElement<T> : DataElementBase<T>
+    {
+        public DataElement(string identifier,
+            Func<IDataElement, T> getDataFunc = null,
+            Action<IDataElement, T> setDataFunc = null,
+            bool createDataChangedEventElement = false,
+            T value = default,
+            TimeSpan? cacheTimeout = null,
+            Format format = null,
+            List<string> profiles = null,
+            string uid = null,
+            bool isHidden = false) :
+            base(identifier,
+                true,
+                getDataFunc,
+                true,
+                setDataFunc,
+                createDataChangedEventElement,
+                value,
+                cacheTimeout,
+                format, profiles, uid, isHidden)
+        {
         }
     }
 }

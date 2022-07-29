@@ -1,4 +1,6 @@
-﻿namespace ifmIoTCore.NetAdapter.Mqtt
+﻿using ifmIoTCore.Common.Variant;
+
+namespace ifmIoTCore.NetAdapter.Mqtt
 {
     using System;
     using System.Collections.Generic;
@@ -8,10 +10,13 @@
     using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
+    using Base;
+    using Common;
     using Elements;
     using Elements.ServiceData.Responses;
     using Exceptions;
-    using ifmIoTCore.Messages;
+    using Messages;
+    using Logger;
     using MQTTnet;
     using MQTTnet.Client;
     using MQTTnet.Client.Connecting;
@@ -27,12 +32,12 @@
     /// <summary>
     /// This class implements the server role of the mqtt net adapter.
     /// </summary>
-    public sealed class MqttServerNetAdapter : EventBasedServerNetAdapterBase
+    public sealed class MqttServerNetAdapter : ServerNetAdapterBase
     {
         public const string ProtocolName = "mqtt";
 
         private readonly ILogger _logger;
-        private readonly IConverter _converter;
+        private readonly IMessageConverter _converter;
         
         private readonly MqttConnectionProfileBuilder _connectionProfileBuilder;
         private MqttClient _mqttClient;
@@ -51,7 +56,7 @@
         /// <param name="disconnectionHandler">A handler message in case of disruption of the connection.</param>
         /// <param name="commandTopic">The commandtopic to listen for incoming commands for.</param>
         /// <param name="logger">The logger instance to use for logging.</param>
-        public MqttServerNetAdapter(IElementManager elementManager, IDeviceElement deviceElement, IConverter converter, IPEndPoint endPoint, Action<Exception> disconnectionHandler = null, string commandTopic = "cmdTopic/#", ILogger logger = null)
+        public MqttServerNetAdapter(IElementManager elementManager, IDeviceElement deviceElement, IMessageConverter converter, IPEndPoint endPoint, Action<Exception> disconnectionHandler = null, string commandTopic = "cmdTopic/#", ILogger logger = null)
         {
             this._elementManager = elementManager;
             this._deviceElement = deviceElement;
@@ -59,7 +64,6 @@
             MqttHelper.EnsureDefaultMqttSetup(_elementManager, this._deviceElement);
 
             this._converter = converter;
-            this.ConverterType = converter.Type;
 
             this._disconnectionHandler = disconnectionHandler;
             this._logger = logger ?? new NullLogger();
@@ -78,12 +82,16 @@
         /// <summary>
         /// Gets the IConverter type for the data format, which the network adapter server implements .
         /// </summary>
-        public override string ConverterType { get; }
+        public override string Scheme => ProtocolName;
+
+        public override string Format => _converter.Type;
 
         /// <summary>
         /// Gets the uri of the network adapter server.
         /// </summary>
         public override Uri Uri => this._connectionProfileBuilder.Uri;
+
+        public override bool IsListening => throw new NotImplementedException();
 
         public string CurrentClientId => this._mqttClient?.Options?.ClientId;
         public string CommandTopic => this._connectionProfileBuilder.CommandTopic;
@@ -252,41 +260,39 @@
                 if (eventArgs?.ApplicationMessage?.Payload == null ||
                     eventArgs.ApplicationMessage?.Payload.Length == 0)
                 {
-                    throw new ServiceException(ResponseCodes.DataInvalid, "The received message is empty or null.");
+                    throw new IoTCoreException(ResponseCodes.DataInvalid, "The received message is empty or null.");
                 }
 
                 var messagePayload = Encoding.UTF8.GetString(eventArgs.ApplicationMessage.Payload);
 
-                var message = this._converter.Deserialize<Message>(messagePayload);
+                var message = this._converter.Deserialize(messagePayload);
                 switch (message.Code)
                 {
                     case RequestCodes.Request:
                     {
-                        var requestMessage = this._converter.Deserialize<RequestMessage>(messagePayload);
-                        var requestEventArgs = new RequestMessageEventArgs(requestMessage);
+                        var requestEventArgs = new RequestMessageEventArgs(message);
                         this.RaiseRequestReceived(requestEventArgs);
 
-                        await this.PublishResponseMessageAsync(requestEventArgs.Response);
+                        await this.PublishResponseMessageAsync(requestEventArgs.ResponseMessage);
                         break;
                     }
                     case RequestCodes.Event:
                     {
-                        var eventMessage = this._converter.Deserialize<EventMessage>(messagePayload);
-                        this.RaiseEventReceived(eventMessage);
+                        this.RaiseEventReceived(message);
 
                         break;
                     }
                 }
             }
-            catch (ServiceException serviceException)
+            catch (IoTCoreException serviceException)
             {
-                var errorResponseMessage = new ResponseMessage(ResponseCodes.InternalError, 0, string.Empty, 
-                    Helpers.ToJson(new ErrorInfoResponseServiceData(serviceException.Message)));
+                var errorResponseMessage = new Message(ResponseCodes.InternalError, 0, string.Empty,
+                    null); //Helpers.ToJson(new ErrorInfoResponseServiceData(serviceException.Message)));
                 await this.PublishResponseMessageAsync(errorResponseMessage);
             }
             catch (Exception exception)
             {
-                var errorResponseMessage = new ResponseMessage(ResponseCodes.InternalError, 0, string.Empty, exception.Message);
+                var errorResponseMessage = new Message(ResponseCodes.InternalError, 0, string.Empty, (VariantValue)exception.Message);
                 await this.PublishResponseMessageAsync(errorResponseMessage);
             }
         }

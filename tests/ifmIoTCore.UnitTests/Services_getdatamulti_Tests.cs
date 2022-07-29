@@ -1,33 +1,62 @@
-﻿namespace ifmIoTCore.UnitTests
+﻿using System.Linq;
+using ifmIoTCore.Common.Variant;
+using ifmIoTCore.Elements;
+
+namespace ifmIoTCore.UnitTests
 {
     using System;
     using System.Collections.Generic;
     using Exceptions;
     using ifmIoTCore.Elements.Formats;
     using ifmIoTCore.Elements.ServiceData.Requests;
+    using ifmIoTCore.Elements.ServiceData.Responses;
     using ifmIoTCore.Elements.Valuations;
     using Messages;
     using Newtonsoft.Json.Linq;
     using NUnit.Framework;
+    using Utilities;
 
-    public class complexData
+    public class complexData: IEquatable<complexData>
     {
-        public int int1; public float float1; public string string1;
+        public int int1 { get; set; }
+        public float float1 { get; set; }
+        public string string1 { get; set; }
+
+        public complexData()
+        {
+            
+        }
+
         public complexData(int newint = 42, float newfloat = 42f, string newstring = "everything")
         {
             int1 = newint; float1 = newfloat; string1 = newstring;
         }
-        public override bool Equals(object obj)
+        
+        public bool Equals(complexData other)
         {
-            var other = obj as complexData;
-            if (other == null) return false;
-            return (int1.Equals(other.int1) && float1.Equals(other.float1) && string1.Equals(other.string1));
-        }
-        public override int GetHashCode()
-        {
-            return ( int1, float1, string1 ).GetHashCode();
+            if (ReferenceEquals(null, other)) return false;
+            if (ReferenceEquals(this, other)) return true;
+            return int1 == other.int1 && float1.Equals(other.float1) && string1 == other.string1;
         }
 
+        public override bool Equals(object obj)
+        {
+            if (ReferenceEquals(null, obj)) return false;
+            if (ReferenceEquals(this, obj)) return true;
+            if (obj.GetType() != this.GetType()) return false;
+            return Equals((complexData) obj);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                var hashCode = int1;
+                hashCode = (hashCode * 397) ^ float1.GetHashCode();
+                hashCode = (hashCode * 397) ^ (string1 != null ? string1.GetHashCode() : 0);
+                return hashCode;
+            }
+        }
     }
 
     [TestFixture]
@@ -37,61 +66,65 @@
         [Test, Property("TestCaseKey", "IOTCS-T63")]
         public void getdatamulti_ErrorResponseOnInvalidation_datatosend_missingOrNull()
         { 
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            Assert.Multiple(() =>
-            {
-                Assert.Throws<IoTCoreException>(() => ioTCore.Root.GetDataMulti(new GetDataMultiRequestServiceData(null)));
-                Assert.AreEqual(422, ResponseCodes.DataInvalid);
-                Assert.That(ioTCore.HandleRequest(0, "/getdatamulti").Code,
-                    Is.EqualTo(ResponseCodes.DataInvalid));
-                Assert.That(ioTCore.HandleRequest(0, "/getdatamulti", JToken.Parse("{'datatosend':null}")).Code,
-                    Is.EqualTo(ResponseCodes.DataInvalid));
-            });
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+
+            var getDataMultiService = ioTCore.Root.GetDataMultiServiceElement;
+
+            Assert.Throws<IoTCoreException>(() => getDataMultiService.Invoke(Variant.FromObject(new GetDataMultiRequestServiceData(null))));
+            Assert.AreEqual(422, ResponseCodes.DataInvalid);
+            Assert.That(ioTCore.HandleRequest(0, "/getdatamulti").Code, Is.EqualTo(ResponseCodes.DataInvalid));
+            Assert.That(ioTCore.HandleRequest(0, "/getdatamulti", new VariantObject { { "datatosend", VariantValue.CreateNull() } }).Code, Is.EqualTo(ResponseCodes.DataInvalid));
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T63")]
         public void getdatamulti_Ok200ResponseOn_empty_datatosend_list()
         { 
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            Assert.That(
-                ioTCore.Root.GetDataMulti(new GetDataMultiRequestServiceData(new List<string>())),
-                Is.Empty);
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+
+            var getDataMultiService = ioTCore.Root.GetDataMultiServiceElement;
+
+            var result = getDataMultiService.Invoke(Variant.FromObject(new GetDataMultiRequestServiceData(new List<string>())));
+            var resultData = Variant.ToObject<GetDataMultiResponseServiceData>(result);
+
+            Assert.That(resultData, Is.Empty);
             Assert.AreEqual(200, ResponseCodes.Success);
-            Assert.That(ioTCore.HandleRequest(0, "/getdatamulti", JToken.Parse(@"{'datatosend':[]}")).Code, 
-                Is.EqualTo(ResponseCodes.Success));
+
+            var response = ioTCore.HandleRequest(0, "/getdatamulti", new VariantObject() { { "datatosend", new VariantArray() } });
+            Assert.That(response.Code, Is.EqualTo(ResponseCodes.Success));
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T64")]
         public void getdatamulti_Responds_AddressCodeValue_ForDataElement_Single()
         {
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            ioTCore.CreateDataElement<int>(ioTCore.Root,
-                "int1", 
-                    (s) => { return 42; }, 
-                    format: new IntegerFormat(new IntegerValuation(0)));
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+            ioTCore.Root.AddChild(new ReadOnlyDataElement<int>("int1",
+                    (s) => { return 42; },
+                    format: new IntegerFormat(new IntegerValuation(0))), true);
             Assert.AreEqual(200, ResponseCodes.Success);
-            var getdatamultiResponse = ioTCore.HandleRequest(0, "/getdatamulti", JToken.Parse(@"{'datatosend':['/int1']}"));
+            var getdatamultiResponse = ioTCore.HandleRequest(0, "/getdatamulti", new VariantObject() { { "datatosend", new VariantArray() { new VariantValue("/int1") } } });
+            var getdatamultiResponseData = VariantObject.ToObject<GetDataMultiResponseServiceData>(getdatamultiResponse.Data);
+
             Assert.AreEqual(ResponseCodes.Success, getdatamultiResponse.Code);
-            Assert.IsNotNull(getdatamultiResponse.Data.SelectToken("$./int1"));
-            Assert.AreEqual(getdatamultiResponse.Data.SelectToken("$./int1.code").ToObject<int>(), 200);
-            Assert.AreEqual(getdatamultiResponse.Data.SelectToken("$./int1.data").ToObject<int>(), 42);
+
+            Assert.NotNull(getdatamultiResponseData.FirstOrDefault(x=>x.Key == "/int1"));
+
+            Assert.AreEqual(200, getdatamultiResponseData["/int1"].Code);
+            Assert.AreEqual(42, (int)(VariantValue)getdatamultiResponseData["/int1"].Data);
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T65")]
         public void getdatamulti_Responds_AddressCodeValue_ForDataElements_10()
         {
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
             for (var i = 1; i <= 5; i++)
-                ioTCore.CreateDataElement<int>(ioTCore.Root,
-                    string.Format("int{0}", i),
+                ioTCore.Root.AddChild(new ReadOnlyDataElement<int>(string.Format("int{0}", i),
                         (s) => { return 42; },
-                        format: new IntegerFormat(new IntegerValuation(0)));
+                        format: new IntegerFormat(new IntegerValuation(0))), true);
 
             for (var i = 1; i <= 3; i++)
-                ioTCore.CreateDataElement<string>(ioTCore.Root,
-                    string.Format("string{0}", i), 
+                ioTCore.Root.AddChild(new ReadOnlyDataElement<string>(string.Format("string{0}", i),
                         (s) => { return "everything"; },
-                        format: new StringFormat(new StringValuation("")));
+                        format: new StringFormat(new StringValuation(""))), true);
 
             // complex type data element
             var intField = new Field("intField", new IntegerFormat(new IntegerValuation(-100, 100)));
@@ -100,41 +133,55 @@
             var complextypeValn = new ObjectValuation(new List<Field> { intField, floatField, stringField });
 
             for (var i = 1; i <= 2; i++)
-                ioTCore.CreateDataElement<complexData>(ioTCore.Root,
-                    string.Format("complex{0}", i), 
+                ioTCore.Root.AddChild(new ReadOnlyDataElement<complexData>(string.Format("complex{0}", i),
                         (s) => { return new complexData(); },
-                        null,
-                        format: new Format("customtype", "customencoding", complextypeValn));
+                        
+                        format: new Format("customtype", "customencoding", complextypeValn)), true);
 
-            var getdatamultiResponse = ioTCore.HandleRequest(0, "/getdatamulti", 
-                JToken.Parse(@"{'datatosend': [ '/int1', '/int2', '/int3', '/int4', '/int5', 
-                                                '/string1', '/string2', '/string3', 
-                                                '/complex1', '/complex2']
-                                }"));
+            
+
+            var getdatamultiResponse = ioTCore.HandleRequest(0, "/getdatamulti",
+                new VariantObject()
+                {
+                    {"datatosend" , new VariantArray()
+                    {
+                        new VariantValue("/int1"),
+                        new VariantValue("/int2"),
+                        new VariantValue("/int3"),
+                        new VariantValue("/int4"),
+                        new VariantValue("/int5"),
+                        new VariantValue("/string1"),
+                        new VariantValue("/string2"),
+                        new VariantValue("/string3"),
+                        new VariantValue("/complex1"),
+                        new VariantValue("/complex2")
+
+                    }}
+                });
             Assert.AreEqual(200, ResponseCodes.Success);
             Assert.AreEqual(ResponseCodes.Success, getdatamultiResponse.Code);
-            var multidata = getdatamultiResponse.Data;
+            var multidata = Variant.ToObject<GetDataMultiResponseServiceData>(getdatamultiResponse.Data);
             Assert.Multiple(() =>
             {
                 for (var i = 1; i <= 5; i++)
                 {
-                    Assert.IsNotNull(multidata.SelectToken(string.Format("$./int{0}", i)));
-                    Assert.AreEqual(ResponseCodes.Success, multidata.SelectToken(string.Format("$./int{0}.code", i)).ToObject<int>());
-                    Assert.AreEqual(42, multidata.SelectToken(string.Format("$./int{0}.data", i)).ToObject<int>());
+                    Assert.IsNotNull(multidata.FirstOrDefault(x=>x.Key == string.Format("$./int{0}", i)));
+                    Assert.AreEqual(ResponseCodes.Success, multidata[string.Format("/int{0}", i)].Code);
+                    Assert.AreEqual(42, (int)(VariantValue)multidata[string.Format("/int{0}", i)].Data);
                 }
 
                 for (var i = 1; i <= 3; i++)
                 {
-                    Assert.IsNotNull(multidata.SelectToken(string.Format("$./string{0}", i)));
-                    Assert.AreEqual(ResponseCodes.Success, multidata.SelectToken(string.Format("$./string{0}.code", i)).ToObject<int>());
-                    Assert.AreEqual("everything" , multidata.SelectToken(string.Format("$./string{0}.data", i)).ToObject<string>());
+                    Assert.IsNotNull(multidata.FirstOrDefault(x=>x.Key == string.Format("/string{0}", i)));
+                    Assert.AreEqual(ResponseCodes.Success, multidata[string.Format("/string{0}", i)].Code);
+                    Assert.AreEqual("everything" , (string)(VariantValue)multidata[string.Format("/string{0}", i)].Data);
                 }
 
                 for (var i = 1; i <= 2; i++)
                 {
-                    Assert.IsNotNull(multidata.SelectToken(string.Format("$./complex{0}", i)));
-                    Assert.AreEqual(ResponseCodes.Success, multidata.SelectToken(string.Format("$./complex{0}.code", i)).ToObject<int>());
-                    Assert.AreEqual("everything", multidata.SelectToken(string.Format("$./complex{0}.data.string1", i)).ToObject<string>());
+                    Assert.IsNotNull(multidata.FirstOrDefault(x=>x.Key == string.Format("/complex{0}", i)));
+                    Assert.AreEqual(ResponseCodes.Success, multidata[string.Format("/complex{0}", i)].Code);
+                    Assert.AreEqual(Variant.FromObject(new complexData()), multidata[string.Format("/complex{0}", i)].Data.AsVariantObject());
                 }
 
             });
@@ -143,67 +190,65 @@
         [Test, Property("TestCaseKey", "IOTCS-T66")]
         public void getdatamulti_404NotFound_ForUnknownDataElement()
         {
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            var getdatamultiResponse = ioTCore.HandleRequest(0, "/getdatamulti", 
-                JToken.Parse(@"{'datatosend':['/unknown']}"));
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+            var getdatamultiResponse = ioTCore.HandleRequest(0, "/getdatamulti", new VariantObject() { { "datatosend", new VariantArray() { new VariantValue("/unknown") } } });
             Assert.AreEqual(200, ResponseCodes.Success);
             Assert.AreEqual(ResponseCodes.Success, getdatamultiResponse.Code);
             Assert.AreEqual(404, ResponseCodes.NotFound);
 
-            Assert.IsNotNull(getdatamultiResponse.Data.SelectToken("$./unknown"));
-            Assert.AreEqual(ResponseCodes.NotFound, getdatamultiResponse.Data.SelectToken("$./unknown.code").ToObject<int>());
-            Assert.AreEqual(JToken.Parse("null"), getdatamultiResponse.Data.SelectToken("$./unknown.data"));
+            var getdatamultiResponseData = Variant.ToObject<GetDataMultiResponseServiceData>(getdatamultiResponse.Data);
+
+            Assert.NotNull(getdatamultiResponseData.FirstOrDefault(x=>x.Key == "/unknown"));
+            
+            Assert.AreEqual(ResponseCodes.NotFound, getdatamultiResponseData["/unknown"].Code);
+            Assert.AreEqual(VariantValue.CreateNull(), getdatamultiResponseData["/unknown"].Data);
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T65")]
         public void getdatamulti_ForNoGetterDataElement_Success()
         { // TODO move this test script to getdata service tests where it belongs
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            ioTCore.CreateDataElement<object>(ioTCore.Root, "int_nogetter");
-            var getdatamultiResponse = ioTCore.HandleRequest(0, "/getdatamulti", 
-                JToken.Parse(@"{'datatosend':[ '/int_nogetter']}"));
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+            ioTCore.Root.AddChild(new DataElement<object>("int_nogetter"), true);
+            var getdatamultiResponse = ioTCore.HandleRequest(0, "/getdatamulti",
+                new VariantObject()
+                {
+                    { "datatosend", new VariantArray() { new VariantValue("/int_nogetter") } }
+                });
             Assert.AreEqual(200, ResponseCodes.Success);
             Assert.AreEqual(ResponseCodes.Success, getdatamultiResponse.Code);
             Assert.AreEqual(501, ResponseCodes.NotImplemented);
 
-            Assert.IsNotNull(getdatamultiResponse.Data.SelectToken("$./int_nogetter"));
-            Assert.AreEqual(ResponseCodes.Success, getdatamultiResponse.Data.SelectToken("$./int_nogetter.code").ToObject<int>());
-            Assert.AreEqual(JToken.Parse("null"), getdatamultiResponse.Data.SelectToken("$./int_nogetter.data"));
+            var getdatamultiResponseData = Variant.ToObject<GetDataMultiResponseServiceData>(getdatamultiResponse.Data);
+
+            Assert.NotNull(getdatamultiResponseData.FirstOrDefault(x=>x.Key  == "/int_nogetter"));
+
+            Assert.AreEqual(ResponseCodes.Success, getdatamultiResponseData["/int_nogetter"].Code);
+            Assert.AreEqual(VariantValue.CreateNull(), getdatamultiResponseData["/int_nogetter"].Data);
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T78")]
         public void getdatamulti_400BadRequest_ForNonDataElement()
         { // TODO move this test script to getdata service tests where it belongs
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            ioTCore.CreateStructureElement(ioTCore.Root, "nondataelement");
-            var getdatamultiResponse = ioTCore.HandleRequest(0,  "/getdatamulti", 
-                JToken.Parse(@"{'datatosend':[ '/nondataelement']}"));
+
+            
+
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+            ioTCore.Root.AddChild(new StructureElement("nondataelement"), true);
+            var getdatamultiResponse = ioTCore.HandleRequest(0,  "/getdatamulti",
+                new VariantObject()
+                {
+                    {"datatosend", new VariantArray() { new VariantValue("/nondataelement") }}
+                });
             Assert.AreEqual(200, ResponseCodes.Success);
             Assert.AreEqual(ResponseCodes.Success, getdatamultiResponse.Code);
             Assert.AreEqual(400, ResponseCodes.BadRequest);
 
-            Assert.IsNotNull(getdatamultiResponse.Data.SelectToken("$./nondataelement"));
-            Assert.AreEqual(ResponseCodes.BadRequest, getdatamultiResponse.Data.SelectToken("$./nondataelement.code").ToObject<int>());
-            Assert.AreEqual(JToken.Parse("null"), getdatamultiResponse.Data.SelectToken("$./nondataelement.data"));
-        }
+            var getdatamultiResponseData = Variant.ToObject<GetDataMultiResponseServiceData>(getdatamultiResponse.Data);
 
-        [Test, Property("TestCaseKey", "IOTCS-T69")]
-        public void getdatamulti_Service_AccessibleThroughNetAdapter_http()
-        {
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            ioTCore.CreateDataElement<int>(ioTCore.Root, 
-                "int1", 
-                    (s) => { return 42; });
-            Assert.AreEqual(200, ResponseCodes.Success);
-            var getdatamultiResponse = new StartNetAdapterServerAndGetResponseHttp().Do( 
-                new RequestMessage(1,"/getdatamulti", JToken.Parse(@"{'datatosend':['/int1']}")),
-                ioTCore,
-                new Uri("http://127.0.0.1:10004"), TestContext.Out);
-            Assert.AreEqual(ResponseCodes.Success, getdatamultiResponse.Code);
-            Assert.IsNotNull(getdatamultiResponse.Data.SelectToken("$./int1"));
-            Assert.AreEqual(getdatamultiResponse.Data.SelectToken("$./int1.code").ToObject<int>(), 200);
-            Assert.AreEqual(getdatamultiResponse.Data.SelectToken("$./int1.data").ToObject<int>(), 42);
+            Assert.NotNull(getdatamultiResponseData.FirstOrDefault(x=>x.Key == "/nondataelement"));
+            Assert.AreEqual(ResponseCodes.BadRequest, getdatamultiResponseData["/nondataelement"].Code);
+            Assert.AreEqual(VariantValue.CreateNull(), getdatamultiResponseData["/nondataelement"].Data);
         }
-
     }
 }
+

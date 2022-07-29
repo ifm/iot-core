@@ -1,12 +1,8 @@
 ﻿namespace ifmIoTCore.Profiles.IoTCoreManagement.ServiceData.Requests
 {
-    using System;
     using System.Collections.Generic;
-    using Elements.Formats;
-    using Exceptions;
-    using Messages;
-    using Newtonsoft.Json;
-    using Newtonsoft.Json.Linq;
+    using Common.Variant;
+    using Elements;
 
     /// <summary>
     /// Represents the incoming data for a IDeviceElement.AddElement service call
@@ -16,44 +12,49 @@
         /// <summary>
         /// The address of the parent element to which the element is added
         /// </summary>
-        [JsonProperty("adr", Required = Required.Always)]
-        public readonly string Address;
-
+        [VariantProperty("adr", Required = true)]
+        public string Address { get; set; }
+        
         /// <summary>
         /// The type of the element
         /// </summary>
-        [JsonProperty("type", Required = Required.Always)]
-        public readonly string Type;
+        [VariantProperty("type", Required = true)]
+        public string Type { get; set; }
 
         /// <summary>
         /// The identifier of the element
         /// </summary>
-        [JsonProperty("identifier", Required = Required.Always)]
-        public readonly string Identifier;
+        [VariantProperty("identifier", Required = true)]
+        public string Identifier { get; set; }
 
         /// <summary>
         /// The format of the element
         /// </summary>
-        [JsonProperty("format", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public readonly Format Format;
+        [VariantProperty("format", Required = false)]
+        public Format Format { get; set; }
 
         /// <summary>
         /// The unique identifier of the element
         /// </summary>
-        [JsonProperty("uid", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public readonly string UId;
+        [VariantProperty("uid", Required = false)]
+        public string UId { get; set; }
 
         /// <summary>
         /// The list of profiles the element belongs to
         /// </summary>
-        [JsonProperty("profiles", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public readonly List<string> Profiles;
+        [VariantProperty("profiles", Required = false)]
+        public List<string> Profiles { get; set; }
 
         /// <summary>
         /// Adds a datachanged event element if true and the created element is a data element; otherwise not
         /// </summary>
-        [JsonProperty("adddatachanged", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public readonly bool AddDataChanged;
+        [VariantProperty("adddatachanged", Required = false)]
+        public bool AddDataChanged { get; set; }
+
+        [VariantConstructor]
+        public AddElementRequestServiceData()
+        {
+        }
 
         /// <summary>
         /// Initializes a new instance of the class
@@ -73,23 +74,6 @@
             UId = uid;
             Profiles = profiles;
             AddDataChanged = addDataChanged;
-        }
-
-        /// <summary>
-        /// Creates a new instance of the class from a json object
-        /// </summary>
-        /// <param name="json">The json object which is converted</param>
-        /// <returns>The new instance of the class</returns>
-        public static AddElementRequestServiceData FromJson(JToken json)
-        {
-            try
-            {
-                return json.ToObject<AddElementRequestServiceData>();
-            }
-            catch (Exception e)
-            {
-                throw new ServiceException(ResponseCodes.DataInvalid, e.Message);
-            }
         }
     }
 }

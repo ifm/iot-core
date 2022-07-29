@@ -4,43 +4,45 @@
     using System.Threading;
     using ifmIoTCore;
     using ifmIoTCore.Elements;
-    using ifmIoTCore.Elements.ServiceData.Requests;
 
     internal class Program
     {
         static void Main()
         {
+            Timer eventTimer = null;
             try
             {
                 var ioTCore = IoTCoreFactory.Create("MyIoTCore");
 
-                var struct1 = ioTCore.CreateStructureElement(ioTCore.Root, 
-                    "struct1");
+                var struct1 = new StructureElement("struct1");
+                ioTCore.Root.AddChild(struct1);
 
-                var event1 = ioTCore.CreateEventElement(struct1, 
-                    "event1");
+                var event1 = new EventElement("event1");
+                struct1.AddChild(event1);
 
-                event1.Subscribe(HandleNotificationEvent);
+                event1.Subscribe(HandleEvent1);
 
-                var eventTimer = new Timer(TriggerEvent1, event1, 5000, 60000);
+                eventTimer = new Timer(RaiseEvent1, event1, 5000, 60000);
             }
             catch (Exception e)
             {
                 Console.WriteLine(e.Message);
             }
             Console.ReadLine();
+
+            eventTimer?.Dispose();
         }
 
-        private static void HandleNotificationEvent(IEventElement element)
+        private static void HandleEvent1(object sender)
         {
-            Console.WriteLine("HandleNotificationEvent called");
+            Console.WriteLine("HandleEvent1 called");
 
-            Console.WriteLine($"Received event from {element.Address}");
+            Console.WriteLine($"Received event from {((IEventElement)sender).Address}");
         }
 
-        private static void TriggerEvent1(object param)
+        private static void RaiseEvent1(object param)
         {
-            Console.WriteLine("TriggerEvent1 called");
+            Console.WriteLine("RaiseEvent1 called");
 
             var event1 = (IEventElement)param;
             event1.RaiseEvent();

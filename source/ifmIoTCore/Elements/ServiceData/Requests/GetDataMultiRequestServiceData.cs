@@ -1,7 +1,7 @@
 ﻿namespace ifmIoTCore.Elements.ServiceData.Requests
 {
     using System.Collections.Generic;
-    using Newtonsoft.Json;
+    using Common.Variant;
 
     /// <summary>
     /// Represents the incoming data for a IDeviceElement.GetDataMulti service call
@@ -11,8 +11,16 @@
         /// <summary>
         /// List of addresses of data elements from which the values are requested
         /// </summary>
-        [JsonProperty("datatosend", Required = Required.Always)]
-        public readonly List<string> DataToSend;
+        [VariantProperty("datatosend", Required = true)]
+        public List<string> DataToSend { get; set; }
+
+        /// <summary>
+        /// The parameterless constructor for the variant converter
+        /// </summary>
+        [VariantConstructor]
+        public GetDataMultiRequestServiceData()
+        {
+        }
 
         /// <summary>
         /// Initializes a new instance of the class

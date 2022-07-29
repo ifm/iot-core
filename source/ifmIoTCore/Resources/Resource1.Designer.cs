@@ -19,7 +19,7 @@ namespace ifmIoTCore.Resources {
     // class via a tool like ResGen or Visual Studio.
     // To add or remove a member, edit your .ResX file then rerun ResGen
     // with the /str option, or rebuild your VS project.
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "16.0.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "17.0.0.0")]
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     public class Resource1 {
@@ -75,6 +75,15 @@ namespace ifmIoTCore.Resources {
         public static string AddElementToLinkNotAllowed {
             get {
                 return ResourceManager.GetString("AddElementToLinkNotAllowed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The link between &apos;{0}&apos; and &apos;{1}&apos; would cause a circular dependency and is therefore not allowed .
+        /// </summary>
+        public static string AddLinkNotAllowed {
+            get {
+                return ResourceManager.GetString("AddLinkNotAllowed", resourceCulture);
             }
         }
         
@@ -214,6 +223,15 @@ namespace ifmIoTCore.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to The adr field of a message may not be null or empty.
+        /// </summary>
+        public static string InvalidMessageAddress {
+            get {
+                return ResourceManager.GetString("InvalidMessageAddress", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to The message code &apos;{0}&apos; is invalid.
         /// </summary>
         public static string InvalidMessageCode {
@@ -268,6 +286,15 @@ namespace ifmIoTCore.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to The link between &apos;{0}&apos; and &apos;{1}&apos; already exists.
+        /// </summary>
+        public static string LinkAlreadyExists {
+            get {
+                return ResourceManager.GetString("LinkAlreadyExists", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Links are not modifiable.
         /// </summary>
         public static string LinksNotModifiable {
@@ -304,6 +331,15 @@ namespace ifmIoTCore.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to The root element already exists.
+        /// </summary>
+        public static string RootElementAlreadyExists {
+            get {
+                return ResourceManager.GetString("RootElementAlreadyExists", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Sending event to &apos;{0}&apos; failed with error &apos;{1}&apos;.
         /// </summary>
         public static string SendEventFailed {
@@ -331,7 +367,7 @@ namespace ifmIoTCore.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Service {0} failed. Message: {1}; code {2}.
+        ///   Looks up a localized string similar to Service &apos;{0}&apos; failed; message: &apos;{1}&apos;.
         /// </summary>
         public static string ServiceExecutionFailed {
             get {

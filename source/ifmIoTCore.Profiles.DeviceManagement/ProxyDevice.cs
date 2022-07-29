@@ -1,65 +1,54 @@
-﻿using System.Net;
-using ifmIoTCore.NetAdapter;
-
-namespace ifmIoTCore.Profiles.DeviceManagement
+﻿namespace ifmIoTCore.Profiles.DeviceManagement
 {
     using System;
-    using System.Collections.Generic;
+    using System.Linq;
+    using Common;
+    using Common.Variant;
     using Elements;
-    using Elements.ServiceData.Requests;
-    using Elements.ServiceData.Responses;
     using Exceptions;
+    using ifmIoTCore.Elements;
+    using ifmIoTCore.Elements.ServiceData.Responses;
     using Messages;
-    using Newtonsoft.Json.Linq;
+    using NetAdapter;
     using Utilities;
-
-    //internal class RemoteContext
-    //{
-    //    public Uri Uri;
-    //    public string Address;
-    //    public AuthenticationInfo AuthenticationInfo;
-    //}
 
     internal class ProxyDevice
     {
-        private readonly IElementManager _elementManager;
-        private readonly IMessageSender _messageSender;
-        private readonly IServerNetAdapterManager _serverNetAdapterManager;
+        private readonly IClientNetAdapterManager _clientNetAdapterManager;
 
-        private readonly IBaseElement _parentElement;
-        private readonly Uri _uri;
-        private readonly int? _cacheTimeout;
+        private readonly Uri _remoteUri;
+        private readonly string _callback;
+        private readonly TimeSpan? _cacheTimeout;
         private readonly AuthenticationInfo _authenticationInfo;
 
-        public string Uri;
-        public string CallbackUri;
-        public string Alias;
-        public IBaseElement RootElement;
-        
-        public ProxyDevice(IElementManager elementManager,
-            IMessageSender messageSender,
-            IServerNetAdapterManager serverNetAdapterManager,
-            IBaseElement parentElement, 
-            string uri,
-            string callbackUri,
-            string alias, 
+        public IProxyElement RootElement;
+
+        public string RemoteUri => _remoteUri.OriginalString;
+        public string Alias { get; }
+
+        public ProxyDevice(IClientNetAdapterManager clientNetAdapterManager,
+            string remoteUri,
+            string alias,
+            string callback,
             int? cacheTimeout,
             AuthenticationInfo authenticationInfo)
         {
-            _elementManager = elementManager;
-            _messageSender = messageSender;
-            _serverNetAdapterManager = serverNetAdapterManager;
-            _parentElement = parentElement;
-            _uri = new Uri(uri);
-            Uri = uri;
-            CallbackUri = callbackUri;
+            _clientNetAdapterManager = clientNetAdapterManager;
+
+            _remoteUri = new Uri(remoteUri);
             Alias = alias;
-            _cacheTimeout = cacheTimeout;
+            _callback = callback;
+            if (cacheTimeout != null)
+            {
+                _cacheTimeout = TimeSpan.FromMilliseconds(cacheTimeout.Value);
+            }
             _authenticationInfo = authenticationInfo;
         }
 
-        public void CreateElements(GetTreeResponseServiceData remoteTree)
+        public void CreateElements(IBaseElement parentElement)
         {
+            var remoteTree = GetRemoteTree();
+
             // Create a tree response element for the root of the tree 
             var remoteElement = new GetTreeResponseServiceData.Element
             {
@@ -69,34 +58,68 @@ namespace ifmIoTCore.Profiles.DeviceManagement
                 Subs = remoteTree.Subs
             };
 
-            RootElement = CreateElement(_parentElement, remoteElement);
+            // Create the root device element
+            var remoteContext = new RemoteContext(_remoteUri, Helpers.RootAddress, _authenticationInfo, _callback);
+            RootElement = CreateProxyDeviceElement(parentElement, remoteElement, remoteContext);
+
+            // Create all child elements
+            if (remoteElement.Subs != null)
+            {
+                foreach (var item in remoteElement.Subs)
+                {
+                    CreateElement(RootElement, item);
+                }
+            }
 
 
             // ToDo: Create treechanged handler service and subscribe to remote tree changed event
 
-            _elementManager.RaiseTreeChanged();
+            parentElement.RaiseTreeChanged();
         }
 
-        private IBaseElement CreateElement(IBaseElement parentElement,
+        private GetTreeResponseServiceData GetRemoteTree()
+        {
+            var client = _clientNetAdapterManager.CreateClientNetAdapter(_remoteUri);
+            var response = client.SendRequest(new Message(RequestCodes.Request, 
+                1, 
+                Helpers.CreateAddress(null, Identifiers.GetTree), 
+                null, 
+                null, 
+                _authenticationInfo));
+            if (ResponseCodes.IsError(response.Code))
+            {
+                throw new IoTCoreException(response.Code, response.Data.ToString());
+            }
+
+            return Variant.ToObject<GetTreeResponseServiceData>(response.Data);
+        }
+
+
+        private void CreateElement(IProxyElement parentElement,
             GetTreeResponseServiceData.Element remoteElement)
         {
-            IBaseElement element = null;
+            var remoteContext = new RemoteContext(_remoteUri, Helpers.CreateAddress(parentElement.RemoteContext.Address, remoteElement.Identifier), _authenticationInfo, _callback);
+
+            IProxyElement element = null;
             switch (remoteElement.Type)
             {
                 case Identifiers.Device:
-                    element = CreateDeviceElement(parentElement, remoteElement);
+                    element = CreateProxyDeviceElement(parentElement,  remoteElement, remoteContext);
                     break;
                 case Identifiers.Structure:
-                    element = CreateStructureElement(parentElement, remoteElement);
+                    element = CreateProxyStructureElement(parentElement, remoteElement, remoteContext);
                     break;
                 case Identifiers.Service:
-                    element = CreateServiceElement(parentElement, remoteElement);
+                    element = CreateProxyServiceServiceElement(parentElement, remoteElement, remoteContext);
                     break;
                 case Identifiers.Event:
-                    element = CreateEventElement(parentElement, remoteElement);
+                    element = CreateProxyEventElement(parentElement, remoteElement, remoteContext);
                     break;
                 case Identifiers.Data:
-                    element = CreateDataElement(parentElement, remoteElement);
+                    element = CreateProxyDataElement(parentElement, remoteElement, remoteContext);
+                    break;
+                case Identifiers.SubDevice:
+                    element = CreateProxySubDeviceElement(parentElement, remoteElement, remoteContext);
                     break;
             }
 
@@ -107,350 +130,150 @@ namespace ifmIoTCore.Profiles.DeviceManagement
                     CreateElement(element, item);
                 }
             }
-            return element;
         }
 
-        private IBaseElement CreateDeviceElement(IBaseElement parentElement,
-            GetTreeResponseServiceData.Element remoteElement)
+        private IProxyElement CreateProxyDeviceElement(IBaseElement parentElement,
+            GetTreeResponseServiceData.Element remoteElement, 
+            RemoteContext remoteContext)
         {
             // Remove all standard child elements, because they are created along with the element
             remoteElement.Subs.RemoveAll(x => x.Identifier.Equals(Identifiers.GetIdentity, StringComparison.OrdinalIgnoreCase) ||
-                                              x.Identifier.Equals(Identifiers.GetTree, StringComparison.OrdinalIgnoreCase) ||
-                                              x.Identifier.Equals(Identifiers.QueryTree, StringComparison.OrdinalIgnoreCase) ||
-                                              x.Identifier.Equals(Identifiers.GetDataMulti, StringComparison.OrdinalIgnoreCase) ||
-                                              x.Identifier.Equals(Identifiers.SetDataMulti, StringComparison.OrdinalIgnoreCase) ||
-                                              x.Identifier.Equals(Identifiers.GetSubscriberList, StringComparison.OrdinalIgnoreCase));
+                                               x.Identifier.Equals(Identifiers.GetTree, StringComparison.OrdinalIgnoreCase) ||
+                                               x.Identifier.Equals(Identifiers.QueryTree, StringComparison.OrdinalIgnoreCase) ||
+                                               x.Identifier.Equals(Identifiers.GetDataMulti, StringComparison.OrdinalIgnoreCase) ||
+                                               x.Identifier.Equals(Identifiers.SetDataMulti, StringComparison.OrdinalIgnoreCase) ||
+                                               x.Identifier.Equals(Identifiers.GetSubscriberList, StringComparison.OrdinalIgnoreCase));
 
-            return _elementManager.CreateDeviceElement(parentElement,
-                remoteElement.Identifier,
-                GetIdentityFunc,
-                GetTreeFunc,
-                QueryTreeFunc,
-                GetDataMultiFunc,
-                SetDataMultiFunc,
-                GetSubscriberListFunc,
-                remoteElement.Format,
-                remoteElement.Profiles,
-                remoteElement.UId,
-                false,
-                Helpers.CreateAddress((string)parentElement.Context, remoteElement.Identifier));
-        }
-
-        private IBaseElement CreateStructureElement(IBaseElement parentElement,
-            GetTreeResponseServiceData.Element remoteElement)
-        {
-            return _elementManager.CreateStructureElement(parentElement,
+            var element = (ProxyDeviceElement)parentElement.AddChild(new ProxyDeviceElement(_clientNetAdapterManager,
+                remoteContext,
                 remoteElement.Identifier,
                 remoteElement.Format,
                 remoteElement.Profiles,
-                remoteElement.UId,
-                false,
-                Helpers.CreateAddress((string)parentElement.Context, remoteElement.Identifier));
-        }
+                remoteElement.UId), false);
 
-        private IBaseElement CreateServiceElement(IBaseElement parentElement,
-            GetTreeResponseServiceData.Element remoteElement)
-        {
-            return _elementManager.CreateServiceElement<JToken, JToken>(parentElement,
-                remoteElement.Identifier,
-                InvokeServiceFunc,
-                remoteElement.Format,
-                remoteElement.Profiles,
-                remoteElement.UId,
-                false,
-                Helpers.CreateAddress((string)parentElement.Context, remoteElement.Identifier));
-        }
+            // Create treechanged proxy event element
+            var remoteTreeChangedEventElement = remoteElement.Subs.FirstOrDefault(x => x.Identifier == Identifiers.TreeChanged);
+            if (remoteTreeChangedEventElement != null)
+            {
+                remoteElement.Subs.Remove(remoteTreeChangedEventElement);
 
-        private IBaseElement CreateEventElement(IBaseElement parentElement,
-            GetTreeResponseServiceData.Element remoteElement)
-        {
-            remoteElement.Subs.Remove(x => x.Identifier == Identifiers.Subscribe);
-            remoteElement.Subs.Remove(x => x.Identifier == Identifiers.Unsubscribe);
+                var remoteContext2 = new RemoteContext(remoteContext.Uri,
+                    Helpers.CreateAddress(remoteContext.Address, Identifiers.TreeChanged),
+                    remoteContext.AuthenticationInfo,
+                    remoteContext.Callback);
 
-            var element = _elementManager.CreateEventElement(parentElement,
-                remoteElement.Identifier,
-                PreSubscribeFunc,
-                PostUnsubscribeFunc,
-                remoteElement.Format,
-                remoteElement.Profiles,
-                remoteElement.UId,
-                false,
-                Helpers.CreateAddress((string)parentElement.Context, remoteElement.Identifier));
+                var treeChangedEventElement = new ProxyEventElement(_clientNetAdapterManager,
+                    remoteContext2,
+                    remoteTreeChangedEventElement.Identifier,
+                    remoteTreeChangedEventElement.Format,
+                    remoteTreeChangedEventElement.Profiles,
+                    remoteTreeChangedEventElement.UId);
 
-            _elementManager.CreateActionServiceElement(element,
-                Identifiers.CallBackTrigger,
-                (sender, cid) =>
-                {
-                    element.RaiseEvent();
-                },
-                isHidden: true,
-                context: Helpers.CreateAddress((string)element.Context, Identifiers.CallBackTrigger));
+                element.AddChild(treeChangedEventElement, false);
+                element.TreeChangedEventElement = treeChangedEventElement;
+            }
 
             return element;
         }
 
-        private IBaseElement CreateDataElement(IBaseElement parentElement,
-            GetTreeResponseServiceData.Element remoteElement)
+        private IProxyElement CreateProxyStructureElement(IBaseElement parentElement,
+            GetTreeResponseServiceData.Element remoteElement, 
+            RemoteContext remoteContext)
         {
-            var createGetDataServiceElement = remoteElement.Subs.Remove(x => x.Identifier == Identifiers.GetData);
-            var createSetDataServiceElement = remoteElement.Subs.Remove(x => x.Identifier == Identifiers.SetData);
-
-            var element = _elementManager.CreateDataElement<JToken>(parentElement,
+            return (ProxyStructureElement)parentElement.AddChild(new ProxyStructureElement(remoteContext, 
                 remoteElement.Identifier,
-                GetDataFunc,
-                SetDataFunc,
-                createGetDataServiceElement,
-                createSetDataServiceElement,
-                null,
-                _cacheTimeout != null ? TimeSpan.FromMilliseconds(_cacheTimeout.Value) : default,
                 remoteElement.Format,
                 remoteElement.Profiles,
-                remoteElement.UId,
-                false,
-                Helpers.CreateAddress((string)parentElement.Context, remoteElement.Identifier));
+                remoteElement.UId), false);
+        }
+
+        private IProxyElement CreateProxyServiceServiceElement(IBaseElement parentElement,
+            GetTreeResponseServiceData.Element remoteElement, 
+            RemoteContext remoteContext)
+        {
+            return (ProxyServiceElement)parentElement.AddChild(new ProxyServiceElement(_clientNetAdapterManager,
+                remoteContext,
+                remoteElement.Identifier,
+                remoteElement.Format,
+                remoteElement.Profiles,
+                remoteElement.UId), false);
+        }
+
+        private IProxyElement CreateProxyEventElement(IBaseElement parentElement,
+            GetTreeResponseServiceData.Element remoteElement, 
+            RemoteContext remoteContext)
+        {
+            // Remove all standard child elements, because they are created along with the element
+            remoteElement.Subs.RemoveAll(x => x.Identifier.Equals(Identifiers.Subscribe, StringComparison.OrdinalIgnoreCase) ||
+                                               x.Identifier.Equals(Identifiers.Unsubscribe, StringComparison.OrdinalIgnoreCase));
+
+            return (ProxyEventElement)parentElement.AddChild(new ProxyEventElement(_clientNetAdapterManager,
+                remoteContext,
+                remoteElement.Identifier,
+                remoteElement.Format,
+                remoteElement.Profiles,
+                remoteElement.UId), false);
+        }
+
+        private IProxyElement CreateProxyDataElement(IBaseElement parentElement,
+            GetTreeResponseServiceData.Element remoteElement, 
+            RemoteContext remoteContext)
+        {
+            // Remove all standard child elements, because they are created along with the element
+            remoteElement.Subs.RemoveAll(x => x.Identifier.Equals(Identifiers.GetData, StringComparison.OrdinalIgnoreCase) ||
+                                               x.Identifier.Equals(Identifiers.SetData, StringComparison.OrdinalIgnoreCase));
+
+            var element = (ProxyDataElement)parentElement.AddChild(new ProxyDataElement(_clientNetAdapterManager,
+                remoteContext,
+                _cacheTimeout,
+                remoteElement.Identifier,
+                remoteElement.Format,
+                remoteElement.Profiles,
+                remoteElement.UId), false);
+
+            // Create datachanged proxy event element
+            var remoteDataChangedEventElement = remoteElement.Subs.FirstOrDefault(x => x.Identifier == Identifiers.DataChanged);
+            if (remoteDataChangedEventElement != null)
+            {
+                remoteElement.Subs.Remove(remoteDataChangedEventElement);
+
+                var remoteContext2 = new RemoteContext(remoteContext.Uri,
+                    Helpers.CreateAddress(remoteContext.Address, Identifiers.DataChanged),
+                    remoteContext.AuthenticationInfo,
+                    remoteContext.Callback);
+
+                var dataChangedEventElement = new ProxyEventElement(_clientNetAdapterManager,
+                    remoteContext2,
+                    remoteDataChangedEventElement.Identifier,
+                    remoteDataChangedEventElement.Format,
+                    remoteDataChangedEventElement.Profiles,
+                    remoteDataChangedEventElement.UId);
+
+                element.AddChild(dataChangedEventElement, false);
+                element.DataChangedEventElement = dataChangedEventElement;
+            }
 
             return element;
         }
 
-        public void RemoveElements()
+        private IProxyElement CreateProxySubDeviceElement(IBaseElement parentElement,
+            GetTreeResponseServiceData.Element remoteElement, 
+            RemoteContext remoteContext)
         {
-            // Usubscribe from all remote event elements
+            // Remove all standard child elements, because they are created along with the element
+            remoteElement.Subs.Remove(x => x.Identifier.Equals(Identifiers.GetIdentity, StringComparison.OrdinalIgnoreCase));
 
-            _elementManager.RemoveElement(_parentElement, RootElement);
+            return (ProxySubDeviceElement)parentElement.AddChild(new ProxySubDeviceElement(_clientNetAdapterManager, 
+                remoteContext,
+                remoteElement.Identifier,
+                remoteElement.Format,
+                remoteElement.Profiles,
+                remoteElement.UId), false);
         }
 
-
-        private GetIdentityResponseServiceData GetIdentityFunc(IDeviceElement element)
+        public void RemoveElements(IBaseElement parentElement)
         {
-            var response = _messageSender.SendRequest(_uri,
-                new RequestMessage(0,
-                    Helpers.CreateAddress((string)element.Context, Identifiers.GetIdentity),
-                    null,
-                    null,
-                    _authenticationInfo));
-            if (ResponseCodes.IsError(response.Code))
-            {
-                throw new ServiceException(response.Code, response.Data.ToString());
-            }
-
-            return Helpers.FromJson<GetIdentityResponseServiceData>(response.Data);
-        }
-
-        private GetTreeResponseServiceData GetTreeFunc(IDeviceElement element, GetTreeRequestServiceData data)
-        {
-            var response = _messageSender.SendRequest(_uri,
-                new RequestMessage(0, 
-                    Helpers.CreateAddress((string)element.Context, Identifiers.GetTree), 
-                    Helpers.ToJson(data), 
-                    null, 
-                    _authenticationInfo));
-            if (ResponseCodes.IsError(response.Code))
-            {
-                throw new ServiceException(response.Code, response.Data.ToString());
-            }
-            return Helpers.FromJson<GetTreeResponseServiceData>(response.Data);
-        }
-
-        private QueryTreeResponseServiceData QueryTreeFunc(IDeviceElement element, QueryTreeRequestServiceData data)
-        {
-            var response = _messageSender.SendRequest(_uri,
-                new RequestMessage(0, 
-                    Helpers.CreateAddress((string)element.Context, Identifiers.QueryTree), 
-                    Helpers.ToJson(data), 
-                    null, 
-                    _authenticationInfo));
-            if (ResponseCodes.IsError(response.Code))
-            {
-                throw new ServiceException(response.Code, response.Data.ToString());
-            }
-            return Helpers.FromJson<QueryTreeResponseServiceData>(response.Data);
-        }
-
-        private GetDataMultiResponseServiceData GetDataMultiFunc(IDeviceElement element, GetDataMultiRequestServiceData data)
-        {
-            var response = _messageSender.SendRequest(_uri,
-                new RequestMessage(0, 
-                    Helpers.CreateAddress((string)element.Context, Identifiers.GetDataMulti), 
-                    Helpers.ToJson(data), 
-                    null, 
-                    _authenticationInfo));
-            if (ResponseCodes.IsError(response.Code))
-            {
-                throw new ServiceException(response.Code, response.Data.ToString());
-            }
-            return Helpers.FromJson<GetDataMultiResponseServiceData>(response.Data);
-        }
-
-        private void SetDataMultiFunc(IDeviceElement element, SetDataMultiRequestServiceData data)
-        {
-            var response = _messageSender.SendRequest(_uri,
-                new RequestMessage(0, 
-                    Helpers.CreateAddress((string)element.Context, Identifiers.GetDataMulti), 
-                    Helpers.ToJson(data), 
-                    null, 
-                    _authenticationInfo));
-            if (ResponseCodes.IsError(response.Code))
-            {
-                throw new ServiceException(response.Code, response.Data.ToString());
-            }
-        }
-
-        private GetSubscriberListResponseServiceData GetSubscriberListFunc(IDeviceElement element, GetSubscriberListRequestServiceData data)
-        {
-            var response = _messageSender.SendRequest(_uri,
-                new RequestMessage(0, 
-                    Helpers.CreateAddress((string)element.Context, Identifiers.GetDataMulti), 
-                    Helpers.ToJson(data), 
-                    null, 
-                    _authenticationInfo));
-            if (ResponseCodes.IsError(response.Code))
-            {
-                throw new ServiceException(response.Code, response.Data.ToString());
-            }
-            return Helpers.FromJson<GetSubscriberListResponseServiceData>(response.Data);
-        }
-
-        // Service functions
-        private JToken InvokeServiceFunc(IServiceElement element, JToken data, int? cid)
-        {
-            var response = _messageSender.SendRequest(_uri,
-                new RequestMessage(cid ?? 0,
-                    (string)element.Context, 
-                    data, 
-                    null, 
-                    _authenticationInfo));
-            if (ResponseCodes.IsError(response.Code))
-            {
-                throw new ServiceException(response.Code, response.Data.ToString());
-            }
-            return response.Data;
-        }
-
-        // Data element functions
-        private JToken GetDataFunc(IDataElement<JToken> element)
-        {
-            var response = _messageSender.SendRequest(_uri,
-                new RequestMessage(1,
-                    Helpers.CreateAddress((string)element.Context, Identifiers.GetData), 
-                    null, 
-                    null, 
-                    _authenticationInfo));
-            if (ResponseCodes.IsError(response.Code))
-            {
-                throw new ServiceException(response.Code, response.Data?.ToString());
-            }
-
-            return Helpers.FromJson<GetDataResponseServiceData>(response.Data).GetValue<JToken>();
-        }
-
-        private void SetDataFunc(IDataElement<JToken> element, JToken value)
-        {
-            var response = _messageSender.SendRequest(_uri,
-                new RequestMessage(1,
-                    Helpers.CreateAddress((string)element.Context, Identifiers.SetData), 
-                    Helpers.ToJson(new SetDataRequestServiceData(value)), 
-                    null, 
-                    _authenticationInfo));
-            if (ResponseCodes.IsError(response.Code))
-            {
-                throw new ServiceException(response.Code, response.Data.ToString());
-            }
-        }
-
-        // Event functions
-        private void PreSubscribeFunc(IEventElement element, SubscribeRequestServiceData data, int? cid = null)
-        {
-            if (element.Subscriptions.Count == 0)
-            {
-                var callbackUri = GetCallbackUri();
-                
-                string query = null;
-                if (!string.IsNullOrWhiteSpace(data.Callback))
-                {
-                    query = data.Callback.RightIncludeSeparator('?');
-                }
-
-                var uriBuilder = new UriBuilder(callbackUri.Scheme,
-                    callbackUri.Host,
-                    callbackUri.Port,
-                    $"{element.Address}/{Identifiers.CallBackTrigger}",
-                    query);
-                var remoteData = new SubscribeRequestServiceData(uriBuilder.Uri.AbsoluteUri,
-                    new List<string> { "" },
-                    data.SubscriptionId,
-                    data.Persist);
-
-                try
-                {
-                    var response = _messageSender.SendRequest(_uri,
-                        new RequestMessage(cid ?? 0,
-                            Helpers.CreateAddress((string)element.Context, Identifiers.Subscribe),
-                            Helpers.ToJson(remoteData),
-                            null, _authenticationInfo));
-                    if (ResponseCodes.IsError(response.Code))
-                    {
-                        throw new ServiceException(response.Code, response.Data.ToString());
-                    }
-                }
-                catch (Exception e)
-                {
-                    throw new ServiceException(ResponseCodes.InternalError, e.Message);
-                }
-            }
-        }
-        
-        private void PostUnsubscribeFunc(IEventElement element, UnsubscribeRequestServiceData data, int? cid = null)
-        {
-            if (element.Subscriptions.Count == 0)
-            {
-                var callbackUri = GetCallbackUri();
-
-                var uriBuilder = new UriBuilder(callbackUri.Scheme,
-                    callbackUri.Host,
-                    callbackUri.Port,
-                    $"{element.Address}/{Identifiers.CallBackTrigger}");
-
-                var remoteData = new UnsubscribeRequestServiceData(uriBuilder.Uri.ToString(),
-                    data.SubscriptionId,
-                    data.Persist);
-
-                try
-                {
-                    var response = _messageSender.SendRequest(_uri,
-                        new RequestMessage(cid ?? 0,
-                            Helpers.CreateAddress((string)element.Context, Identifiers.Unsubscribe),
-                            Helpers.ToJson(remoteData),
-                            null,
-                            _authenticationInfo));
-                    if (ResponseCodes.IsError(response.Code))
-                    {
-                        throw new ServiceException(response.Code, response.Data.ToString());
-                    }
-                }
-                catch (Exception e)
-                {
-                    throw new ServiceException(ResponseCodes.InternalError, e.Message);
-                }
-                
-            }
-        }
-
-        private Uri GetCallbackUri()
-        {
-            if (CallbackUri != null)
-            {
-                return new Uri(CallbackUri);
-            }
-
-            var callBackNetAdapterServer = _serverNetAdapterManager.FindReverseServerNetAdapter(_uri);
-            if (callBackNetAdapterServer != null)
-            {
-                return callBackNetAdapterServer.Uri;
-            }
-            else
-            {
-                throw new ServiceException(ResponseCodes.InternalError, "No callback network adapter available");
-            }
+            parentElement.RemoveChild(RootElement, true);
         }
     }
 }

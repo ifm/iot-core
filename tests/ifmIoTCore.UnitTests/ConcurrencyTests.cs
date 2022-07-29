@@ -11,10 +11,6 @@ namespace ifmIoTCore.UnitTests
     [TestFixture]
     public class ConcurrencyTests
     {
-        
-
-        
-
         [Test]
         public void MultiThreadedAddElement_AllElementsExist_Success()
         {
@@ -37,8 +33,7 @@ namespace ifmIoTCore.UnitTests
                         {
                             try
                             {
-                                var structureElement =
-                                    ioTCore.CreateStructureElement(ioTCore.Root, $"structure{i1}-{j}");
+                                ioTCore.Root.AddChild(new StructureElement($"structure{i1}-{j}"), true);
                             }
                             catch 
                             {

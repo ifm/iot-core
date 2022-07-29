@@ -2,6 +2,7 @@
 {
     using System;
     using ifmIoTCore;
+    using ifmIoTCore.Elements;
 
     internal class Program
     {
@@ -11,9 +12,11 @@
             {
                 var ioTCore = IoTCoreFactory.Create("MyIoTCore");
 
-                var struct1 = ioTCore.CreateStructureElement(ioTCore.Root, 
-                    "struct1");
-                ioTCore.CreateDataElement<string>(struct1, "string1");
+                var struct1 = new StructureElement("struct1");
+                ioTCore.Root.AddChild(struct1);
+
+                var dataElement = new DataElement<string>("string1");
+                struct1.AddChild(dataElement);
 
                 var string1 = ioTCore.GetElementByAddress("/struct1/string1");
                 Console.WriteLine(string1.Address);

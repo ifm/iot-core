@@ -1,37 +1,37 @@
 namespace ifmIoTCore.NetAdapter.Http
 {
     using System;
+    using Logger;
     using Messages;
-    using Utilities;
 
     public class HttpServerNetAdapter : HttpListenerServerNetAdapter
     {
-        private IIoTCore _ioTCore;
+        private IMessageHandler _messageHandler;
         
-        public HttpServerNetAdapter(IIoTCore ioTCore, Uri uri, IConverter converter, ILogger logger = null)
+        public HttpServerNetAdapter(IMessageHandler ioTCore, Uri uri, IMessageConverter converter, ILogger logger = null)
             : base(uri, converter, logger)
         {
-            this._ioTCore = ioTCore ?? throw new ArgumentNullException(nameof(ioTCore));
-            this.RequestMessageReceived += OnRequestMessageReceived;
-            this.EventMessageReceived += OnEventMessageReceived;
+            this._messageHandler = ioTCore ?? throw new ArgumentNullException(nameof(ioTCore));
+            this.RequestReceived += OnRequestMessageReceived;
+            this.EventReceived += OnEventMessageReceived;
         }
 
         public override void Dispose()
         {
             base.Dispose();
-            this.RequestMessageReceived -= this.OnRequestMessageReceived;
-            this.EventMessageReceived -= this.OnEventMessageReceived;
-            this._ioTCore = null;
+            this.RequestReceived -= this.OnRequestMessageReceived;
+            this.EventReceived -= this.OnEventMessageReceived;
+            this._messageHandler = null;
         }
 
         private void OnEventMessageReceived(object s, EventMessageEventArgs e)
         {
-            this._ioTCore?.HandleEvent(e.EventMessage);
+            this._messageHandler.HandleEvent(e.EventMessage);
         }
 
         private void OnRequestMessageReceived(object s, RequestMessageEventArgs e)
         {
-            e.Response = this._ioTCore?.HandleRequest(e.Request);
+            e.ResponseMessage = this._messageHandler.HandleRequest(e.RequestMessage);
         }
     }
 }

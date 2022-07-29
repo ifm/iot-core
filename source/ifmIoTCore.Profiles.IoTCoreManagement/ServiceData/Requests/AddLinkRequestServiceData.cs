@@ -1,20 +1,25 @@
 ﻿namespace ifmIoTCore.Profiles.IoTCoreManagement.ServiceData.Requests
 {
-    using Newtonsoft.Json;
+    using Common.Variant;
 
     public class AddLinkRequestServiceData
     {
-        [JsonProperty("identifier", Required = Required.Always)]
-        public readonly string Identifier;
+        [VariantProperty("adr", Required = true)]
+        public string SourceAddress { get; set; }
 
-        [JsonProperty("adr", Required = Required.Always)]
-        public readonly string SourceAddress;
+        [VariantProperty("target_adr", Required = true)]
+        public string TargetAddress { get; set; }
 
-        [JsonProperty("target_adr", Required = Required.Always)]
-        public readonly string TargetAddress;
+        [VariantProperty("identifier", Required = false)]
+        public string Identifier { get; set; }
 
-        [JsonProperty("persist", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public readonly bool Persist;
+        [VariantProperty("persist", Required = false)]
+        public bool Persist { get; set; }
+
+        [VariantConstructor]
+        public AddLinkRequestServiceData()
+        {
+        }
 
         public AddLinkRequestServiceData(string identifier, string sourceAddress, string targetAddress, bool persist = false)
         {

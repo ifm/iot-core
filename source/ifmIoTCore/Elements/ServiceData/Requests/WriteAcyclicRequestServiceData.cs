@@ -1,6 +1,6 @@
 ﻿namespace ifmIoTCore.Elements.ServiceData.Requests
 {
-    using Newtonsoft.Json;
+    using Common.Variant;
 
     /// <summary>
     /// Represents the incoming data for a WriteAcyclic service call
@@ -10,20 +10,28 @@
         /// <summary>
         /// The ISDU index to write to the device
         /// </summary>
-        [JsonProperty("index", Required = Required.Always)]
-        public readonly int Index;
+        [VariantProperty("index", Required = true)]
+        public int Index { get; set; }
 
         /// <summary>
         /// The ISDU subindex to write to the device
         /// </summary>
-        [JsonProperty("subindex", Required = Required.Always)]
-        public readonly int SubIndex;
+        [VariantProperty("subindex", Required = true)]
+        public int SubIndex { get; set; }
 
         /// <summary>
         /// The value  to write to the device
         /// </summary>
-        [JsonProperty("value", Required = Required.Always)]
-        public readonly string Value;
+        [VariantProperty("value", Required = true)]
+        public string Value { get; set; }
+
+        /// <summary>
+        /// The parameterless constructor for the variant converter
+        /// </summary>
+        [VariantConstructor]
+        public WriteAcyclicRequestServiceData()
+        {
+        }
 
         /// <summary>
         /// Initializes a new instance of the class

@@ -1,6 +1,6 @@
 ﻿namespace ifmIoTCore.Elements.ServiceData.Requests
 {
-    using Newtonsoft.Json;
+    using Common.Variant;
 
     /// <summary>
     /// Represents the incoming data for a GetBlobData service call
@@ -10,14 +10,22 @@
         /// <summary>
         /// The byte position to start reading in the blob
         /// </summary>
-        [JsonProperty("pos", Required = Required.Always)]
-        public readonly uint Pos;
+        [VariantProperty("pos", Required = true)]
+        public uint Pos { get; set; }
 
         /// <summary>
         /// The byte length of data to read from from blob
         /// </summary>
-        [JsonProperty("length", Required = Required.Always)]
-        public readonly uint Length;
+        [VariantProperty("length", Required = true)]
+        public uint Length { get; set; }
+
+        /// <summary>
+        /// The parameterless constructor for the variant converter
+        /// </summary>
+        [VariantConstructor]
+        public GetBlobDataRequestServiceData()
+        {
+        }
 
         /// <summary>
         /// Initializes a new instance of the class

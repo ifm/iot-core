@@ -1,27 +1,27 @@
 namespace ifmIoTCore.Profiles.DeviceManagement.UnitTests
 {
     using System;
-    using System.Collections.Generic;
     using System.Diagnostics.CodeAnalysis;
     using System.Linq;
     using System.Net;
-    using Converter.Json;
+    using Base;
+    using DeviceManagement;
+    using DeviceManagement.ServiceData.Requests;
+    using ifmIoTCore.Common.Variant;
     using ifmIoTCore.Elements;
     using ifmIoTCore.Elements.ServiceData.Requests;
-    using ifmIoTCore.Elements.ServiceData.Responses;
+    using Logger;
     using Messages;
     using NetAdapter.Http;
     using NUnit.Framework;
-    using DeviceManagement;
-    using DeviceManagement.ServiceData.Requests;
-    using Utilities;
+
 
     public static class UnitTestIoTCoreFactory
     {
         public static IIoTCore Build(string id)
         {
-            var iotCore = IoTCoreFactory.Create(id, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Warning));
-            iotCore.RegisterClientNetAdapterFactory(new HttpClientNetAdapterFactory(new JsonConverter()));
+            var iotCore = IoTCoreFactory.Create(id, null, new ifmIoTCore.Logging.Log4Net.Logger(LogLevel.Warning));
+            iotCore.RegisterClientNetAdapterFactory(new HttpClientNetAdapterFactory(new MessageConverter.Json.Newtonsoft.MessageConverter()));
             return iotCore;
         }
     }
@@ -45,14 +45,14 @@ namespace ifmIoTCore.Profiles.DeviceManagement.UnitTests
             try
             {
                 var uri = new Uri("http://127.0.0.1:9002");
-                server = new HttpServerNetAdapter(iotCore0, uri, new JsonConverter());
+                server = new HttpServerNetAdapter(iotCore0, uri, new MessageConverter.Json.Newtonsoft.MessageConverter());
                 server.Start();
                 var iotCore1 = UnitTestIoTCoreFactory.Build("id1");
                 iotCore1.RegisterServerNetAdapter(server);
-                var deviceProfileBuilder = new DeviceManagementProfileBuilder(iotCore1);
+                var deviceProfileBuilder = new DeviceManagementProfileBuilder(new ProfileBuilderConfiguration(iotCore1, iotCore1.Root.Address));
                 deviceProfileBuilder.Build();
 
-                var result = iotCore1.HandleRequest(0, "/device_management/mirror", Helpers.ToJson(new MirrorRequestServiceData("http://127.0.0.1:9002", uri.ToString())));
+                var result = iotCore1.HandleRequest(0, "/device_management/mirror", Variant.FromObject(new MirrorRequestServiceData("http://127.0.0.1:9002", uri.ToString())));
 
                 Assert.AreEqual(200, result.Code, result.Data?.ToString() ?? "No data provided.");
 
@@ -71,21 +71,22 @@ namespace ifmIoTCore.Profiles.DeviceManagement.UnitTests
         public void MirrorTest1()
         {
             var iotCore = UnitTestIoTCoreFactory.Build("coreId");
-            iotCore.CreateStructureElement(iotCore.Root, "Hello");
+            var structure = new StructureElement("Hello");
+            iotCore.Root.AddChild(structure);
 
             HttpServerNetAdapter httpServer = null;
 
             try
             {
                 var uri = new Uri("http://127.0.0.1:9002");
-                httpServer = new HttpServerNetAdapter(iotCore, uri, new JsonConverter());
+                httpServer = new HttpServerNetAdapter(iotCore, uri, new MessageConverter.Json.Newtonsoft.MessageConverter());
                 httpServer.Start();
                 var iotCore2 = UnitTestIoTCoreFactory.Build("otherIoTCore");
                 iotCore2.RegisterServerNetAdapter(httpServer);
 
-                var deviceProfileBuilder = new DeviceManagementProfileBuilder(iotCore2);
+                var deviceProfileBuilder = new DeviceManagementProfileBuilder(new ProfileBuilderConfiguration(iotCore2, iotCore2.Root.Address));
                 deviceProfileBuilder.Build();
-                var result = iotCore2.HandleRequest(0, "/device_management/mirror", Helpers.ToJson(new MirrorRequestServiceData("http://127.0.0.1:9002", uri.ToString())));
+                var result = iotCore2.HandleRequest(0, "/device_management/mirror", Variant.FromObject(new MirrorRequestServiceData("http://127.0.0.1:9002", uri.ToString())));
 
                 var element = iotCore2.Root.GetElementByAddress("/remote/coreId/Hello");
                 Assert.NotNull(element);
@@ -102,12 +103,13 @@ namespace ifmIoTCore.Profiles.DeviceManagement.UnitTests
         {
             var iotCore1 = UnitTestIoTCoreFactory.Build("id1");
 
-            iotCore1.CreateActionServiceElement(iotCore1.Root, "HandleEvent", null);
+            var handleEventService = new ActionServiceElement("HandleEvent", null);
+            iotCore1.Root.AddChild(handleEventService);
 
             var iotCore2 = UnitTestIoTCoreFactory.Build("id2");
 
-            using var server1 = new HttpServerNetAdapter(iotCore1, new Uri("http://127.0.0.1:8001"), new JsonConverter());
-            using var server2 = new HttpServerNetAdapter(iotCore2, new Uri("http://127.0.0.1:8002"), new JsonConverter());
+            using var server1 = new HttpServerNetAdapter(iotCore1, new Uri("http://127.0.0.1:8001"), new MessageConverter.Json.Newtonsoft.MessageConverter());
+            using var server2 = new HttpServerNetAdapter(iotCore2, new Uri("http://127.0.0.1:8002"), new MessageConverter.Json.Newtonsoft.MessageConverter());
 
             try
             {
@@ -116,7 +118,7 @@ namespace ifmIoTCore.Profiles.DeviceManagement.UnitTests
 
                 var subscribeResult = iotCore1.HandleRequest(0,
                     "id1/treechanged/subscribe",
-                    Helpers.ToJson(new SubscribeRequestServiceData($"http://{IPAddress.Loopback}:8001/HandleEvent", new[] { "/getidentity" }.ToList())));
+                    Variant.FromObject(new SubscribeRequestServiceData($"http://{IPAddress.Loopback}:8001/HandleEvent", new[] { "/getidentity" }.ToList())));
 
                 Assert.NotNull(subscribeResult);
                 Assert.AreEqual(200, subscribeResult.Code);
@@ -137,12 +139,14 @@ namespace ifmIoTCore.Profiles.DeviceManagement.UnitTests
             {
                 var iotCore0 = UnitTestIoTCoreFactory.Build("id0");
 
-                var dataElement = iotCore0.CreateDataElement<string>(iotCore0.Root, "data0",
+                var dataElement = new DataElement<string>("data0",
                     (b) => data,
                     (b, o) => { data = o; });
 
+                iotCore0.Root.AddChild(dataElement);
+
                 var uri = new Uri("http://127.0.0.1:9001");
-                using var server = new HttpServerNetAdapter(iotCore0, uri, new JsonConverter());
+                using var server = new HttpServerNetAdapter(iotCore0, uri, new MessageConverter.Json.Newtonsoft.MessageConverter());
                 server.Start();
 
                 var iotCore1 = UnitTestIoTCoreFactory.Build("id1");
@@ -150,10 +154,10 @@ namespace ifmIoTCore.Profiles.DeviceManagement.UnitTests
 
                 //iotCore1.RegisterClientNetAdapterFactory(new HttpClientNetAdapterFactory(new JsonConverter()));
 
-                var deviceProfileBuilder = new DeviceManagementProfileBuilder(iotCore1);
+                var deviceProfileBuilder = new DeviceManagementProfileBuilder(new ProfileBuilderConfiguration(iotCore1, iotCore1.Root.Address));
                 deviceProfileBuilder.Build();
 
-                var result = iotCore1.HandleRequest(0, "/device_management/mirror", Helpers.ToJson(new MirrorRequestServiceData("http://127.0.0.1:9001", uri.ToString())));
+                var result = iotCore1.HandleRequest(0, "/device_management/mirror", Variant.FromObject(new MirrorRequestServiceData("http://127.0.0.1:9001", uri.ToString())));
 
                 var getDataResponse = iotCore1.HandleRequest(0, "/remote/id0/data0/getdata");
                 Assert.AreEqual(200, getDataResponse.Code);
@@ -177,14 +181,14 @@ namespace ifmIoTCore.Profiles.DeviceManagement.UnitTests
             try
             {
                 var uri = new Uri("http://127.0.0.1:9002");
-                server = new HttpServerNetAdapter(iotCore0, uri, new JsonConverter());
+                server = new HttpServerNetAdapter(iotCore0, uri, new MessageConverter.Json.Newtonsoft.MessageConverter());
                 server.Start();
                 var iotCore1 = UnitTestIoTCoreFactory.Build("id1");
                 iotCore1.RegisterServerNetAdapter(server);
-                var deviceProfileBuilder = new DeviceManagementProfileBuilder(iotCore1);
+                var deviceProfileBuilder = new DeviceManagementProfileBuilder(new ProfileBuilderConfiguration(iotCore1, iotCore1.Root.Address));
                 deviceProfileBuilder.Build();
 
-                var result = iotCore1.HandleRequest(0, "/device_management/mirror", Helpers.ToJson(new MirrorRequestServiceData("http://127.0.0.1:9002", uri.ToString())));
+                var result = iotCore1.HandleRequest(0, "/device_management/mirror", Variant.FromObject(new MirrorRequestServiceData("http://127.0.0.1:9002", uri.ToString())));
 
                 Assert.AreEqual(200, result.Code, result.Data?.ToString() ?? "No data provided.");
 
@@ -194,7 +198,7 @@ namespace ifmIoTCore.Profiles.DeviceManagement.UnitTests
                 Assert.That(string.Equals("id0", remoteElement.Identifier));
 
                 var unmirror = iotCore1.HandleRequest(0, "/device_management/unmirror",
-                    Helpers.ToJson(new UnmirrorRequestServiceData("http://127.0.0.1:9002")));
+                    Variant.FromObject(new UnmirrorRequestServiceData("http://127.0.0.1:9002")));
 
                 Assert.AreEqual(ResponseCodes.Success, unmirror.Code);
                 var remoteElementAfterUnmirror = iotCore1.Root.Subs.FirstOrDefault(x => x.Identifier == "id0");
@@ -216,14 +220,14 @@ namespace ifmIoTCore.Profiles.DeviceManagement.UnitTests
             try
             {
                 var uri = new Uri("http://127.0.0.1:9002");
-                server = new HttpServerNetAdapter(iotCore0, uri, new JsonConverter());
+                server = new HttpServerNetAdapter(iotCore0, uri, new MessageConverter.Json.Newtonsoft.MessageConverter());
                 server.Start();
                 var iotCore1 = UnitTestIoTCoreFactory.Build("id1");
                 iotCore1.RegisterServerNetAdapter(server);
-                var deviceProfileBuilder = new DeviceManagementProfileBuilder(iotCore1);
+                var deviceProfileBuilder = new DeviceManagementProfileBuilder(new ProfileBuilderConfiguration(iotCore1, iotCore1.Root.Address));
                 deviceProfileBuilder.Build();
 
-                var result = iotCore1.HandleRequest(0, "/device_management/mirror", Helpers.ToJson(new MirrorRequestServiceData("http://127.0.0.1:9002", uri.ToString())));
+                var result = iotCore1.HandleRequest(0, "/device_management/mirror", Variant.FromObject(new MirrorRequestServiceData("http://127.0.0.1:9002", uri.ToString())));
 
                 Assert.AreEqual(200, result.Code, result.Data?.ToString() ?? "No data provided.");
 
@@ -233,7 +237,7 @@ namespace ifmIoTCore.Profiles.DeviceManagement.UnitTests
                 Assert.That(string.Equals("id0", remoteElement.Identifier));
 
                 var unmirror = iotCore1.HandleRequest(0, "/device_management/unmirror",
-                    Helpers.ToJson(new UnmirrorRequestServiceData("http://127.0.0.1:9002")));
+                    Variant.FromObject(new UnmirrorRequestServiceData("http://127.0.0.1:9002")));
 
                 Assert.AreEqual(ResponseCodes.Success, unmirror.Code);
                 var remoteElementAfterUnmirror = iotCore1.Root.Subs.FirstOrDefault(x => x.Identifier == "id0");
@@ -255,14 +259,14 @@ namespace ifmIoTCore.Profiles.DeviceManagement.UnitTests
             try
             {
                 var uri = new Uri("http://127.0.0.1:9002");
-                server = new HttpServerNetAdapter(iotCore0, uri, new JsonConverter());
+                server = new HttpServerNetAdapter(iotCore0, uri, new MessageConverter.Json.Newtonsoft.MessageConverter());
                 server.Start();
                 var iotCore1 = UnitTestIoTCoreFactory.Build("id1");
                 iotCore1.RegisterServerNetAdapter(server);
-                var deviceProfileBuilder = new DeviceManagementProfileBuilder(iotCore1);
+                var deviceProfileBuilder = new DeviceManagementProfileBuilder(new ProfileBuilderConfiguration(iotCore1, iotCore1.Root.Address));
                 deviceProfileBuilder.Build();
 
-                var result = iotCore1.HandleRequest(0, "/device_management/mirror", Helpers.ToJson(new MirrorRequestServiceData("http://127.0.0.1:9002", uri.ToString())));
+                var result = iotCore1.HandleRequest(0, "/device_management/mirror", Variant.FromObject(new MirrorRequestServiceData("http://127.0.0.1:9002", uri.ToString())));
 
                 Assert.AreEqual(200, result.Code, result.Data?.ToString() ?? "No data provided.");
 
@@ -272,7 +276,7 @@ namespace ifmIoTCore.Profiles.DeviceManagement.UnitTests
                 Assert.That(string.Equals("id0", remoteElement.Identifier));
 
                 var unmirror = iotCore1.HandleRequest(0, "/device_management/unmirror",
-                    Helpers.ToJson(new UnmirrorRequestServiceData("http://127.0.0.1:9002")));
+                    Variant.FromObject(new UnmirrorRequestServiceData("http://127.0.0.1:9002")));
 
                 Assert.AreEqual(ResponseCodes.Success, unmirror.Code);
                 var remoteElementAfterUnmirror = iotCore1.Root.Subs.FirstOrDefault(x => x.Identifier == "id0");

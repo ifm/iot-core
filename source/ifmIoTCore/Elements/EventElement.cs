@@ -4,164 +4,128 @@
     using System.Collections.Generic;
     using System.Linq;
     using System.Threading;
+    using Common;
+    using Common.Variant;
+    using EventArguments;
     using Exceptions;
-    using Formats;
     using Messages;
     using Resources;
-    using ServiceData;
-    using ServiceData.Events;
     using ServiceData.Requests;
     using ServiceData.Responses;
     using Utilities;
 
-    /// <summary>
-    /// The subscription class
-    /// </summary>
-    public class Subscription
+
+    public class EventElement : BaseElement, IEventElement
     {
-        /// <summary>
-        /// The url to which the IoTCore is sending events
-        /// </summary>
-        public readonly string Callback;
+        public IServiceElement SubscribeServiceElement { get; }
+        public IServiceElement UnsubscribeServiceElement { get; }
 
-        /// <summary>
-        /// The local callback for events
-        /// </summary>
-        public readonly Action<IEventElement> CallbackFunc;
+        public Action<IEventElement, SubscriptionEventArgs> RaiseEventFunc { get; set; }
 
-        /// <summary>
-        /// List of data element addresses, whose values are sent with the event
-        /// </summary>
-        public readonly List<string> DataToSend;
+        public ReaderWriterLockSlim SubscriptionsLock { get; } = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
 
-        /// <summary>
-        /// If true the subscription is persistent; otherwise not 
-        /// </summary>
-        public readonly bool Persist;
-
-        /// <summary>
-        /// The id which identifies the subscription
-        /// </summary>
-        public readonly int SubscriptionId;
-
-        /// <summary>
-        /// Initializes a new instance of the class
-        /// </summary>
-        /// <param name="callback">The url to which the IoTCore is sending events</param>
-        /// <param name="callbackFunc">The local callback for events</param>
-        /// <param name="dataToSend">List of data element addresses, whose values are sent with the event</param>
-        /// <param name="persist">If true the subscription is persistent; otherwise not</param>
-        /// <param name="subscriptionId">The id which identifies the subscription</param>
-        public Subscription(string callback, Action<IEventElement> callbackFunc, List<string> dataToSend, bool persist, int subscriptionId)
-        {
-            Callback = callback;
-            CallbackFunc = callbackFunc;
-            DataToSend = dataToSend;
-            Persist = persist;
-            SubscriptionId = subscriptionId;
-        }
-    }
-
-    internal class EventElement : BaseElement, IEventElement
-    {
-        private IElementManager _elementManager;
-        private IMessageSender _messageSender;
-        private ILogger _logger;
-
-        private Action<IEventElement, SubscribeRequestServiceData, int?> _preSubscribeFunc;
-        private Action<IEventElement, UnsubscribeRequestServiceData, int?> _postUnsubscribeFunc;
-
-        public IDictionary<int, Subscription> Subscriptions { get; } = new Dictionary<int, Subscription>();
-
-        public ReaderWriterLockSlim SubscriptionsLock { get; } = new ReaderWriterLockSlim();
+        public IEnumerable<Subscription> Subscriptions => _subscriptions.Values;
+        protected int SubscriptionCount => _subscriptions.Count;
+        private readonly Dictionary<int, Subscription> _subscriptions = new Dictionary<int, Subscription>();
 
         private static int _eventNumber;
 
-        public EventElement(IElementManager elementManager,
-            IMessageSender messageSender,
-            ILogger logger,
-            IBaseElement parent,
-            string identifier,
-            Action<IEventElement, SubscribeRequestServiceData, int?> preSubscribeFunc = null,
-            Action<IEventElement, UnsubscribeRequestServiceData, int?> postUnsubscribeFunc = null,
+        public EventElement(string identifier,
             Format format = null,
             List<string> profiles = null,
             string uid = null,
-            bool isHidden = false,
-            object context = null) : 
-            base(parent, Identifiers.Event, identifier, format, profiles, uid, isHidden, context)
+            bool isHidden = false) : 
+            base(Identifiers.Event, identifier, format, profiles, uid, isHidden)
         {
-            _elementManager = elementManager;
-            _messageSender = messageSender;
-            _logger = logger;
+            AddChild(SubscribeServiceElement = new ServiceElement(Identifiers.Subscribe, SubscribeServiceFunc));
+            AddChild(UnsubscribeServiceElement = new ServiceElement(Identifiers.Unsubscribe, UnsubscribeServiceFunc));
+        }
 
-            _preSubscribeFunc = preSubscribeFunc;
-            _postUnsubscribeFunc = postUnsubscribeFunc;
+        private Variant SubscribeServiceFunc(IServiceElement _, Variant data, int? cid)
+        {
+            var request = Helpers.VariantToObject<SubscribeRequestServiceData>(data);
 
-            IServiceElement<SubscribeRequestServiceData, SubscribeResponseServiceData> subscribeServiceElement = null;
-            ISetterServiceElement<UnsubscribeRequestServiceData> unsubscribeServiceElement = null;
+            var result = Subscribe(request, cid);
+
+            return Helpers.VariantFromObject(result);
+        }
+
+        public virtual SubscribeResponseServiceData Subscribe(SubscribeRequestServiceData data, int? cid)
+        {
+            if (data == null)
+            {
+                throw new IoTCoreException(ResponseCodes.DataInvalid, string.Format(Resource1.ServiceDataEmpty, Identifiers.Subscribe));
+            }
+            if (data.Callback == null)
+            {
+                throw new IoTCoreException(ResponseCodes.DataInvalid, string.Format(Resource1.InvalidArgument, Identifiers.Callback));
+            }
+
+            var id = AddSubscription(data, cid);
+            return new SubscribeResponseServiceData(id);
+        }
+
+        protected int AddSubscription(SubscribeRequestServiceData data, int? cid)
+        {
+            if (!SubscriptionsLock.TryEnterWriteLock(Configuration.Settings.Timeout))
+            {
+                throw new IoTCoreException(ResponseCodes.Locked, Resource1.ElementManagerLocked);
+            }
 
             try
             {
-                subscribeServiceElement = CreateSubscribeServiceElement();
-                unsubscribeServiceElement = CreateUnsubscribeServiceElement();
+                var id = GenerateSubscriptionId(data.SubscriptionId, cid);
+                if (_subscriptions.ContainsKey(id))
+                {
+                    _subscriptions.Remove(id);
+                }
+                var subscription = new Subscription(id, data.Callback, null, data.DataToSend, data.Persist);
+                _subscriptions.Add(id, subscription);
+
+                return id;
             }
-            catch
+            finally
             {
-                subscribeServiceElement?.Dispose();
-                unsubscribeServiceElement?.Dispose();
-
-                throw;
+                SubscriptionsLock.ExitWriteLock();
             }
         }
 
-        private IServiceElement<SubscribeRequestServiceData, SubscribeResponseServiceData> CreateSubscribeServiceElement()
+        public virtual void Subscribe(Action<IEventElement> callbackFunc)
         {
-            var subscribeServiceElement = new ServiceElement<SubscribeRequestServiceData, SubscribeResponseServiceData>(this, Identifiers.Subscribe, SubscribeServiceFunc);
-            References.AddForwardReference(this, subscribeServiceElement, subscribeServiceElement.Identifier, ReferenceType.Child);
-            return subscribeServiceElement;
+            AddSubscription(callbackFunc);
         }
 
-        private ISetterServiceElement<UnsubscribeRequestServiceData> CreateUnsubscribeServiceElement()
+        protected void AddSubscription(Action<IEventElement> callbackFunc)
         {
-            var unsubscribeServiceElement = new SetterServiceElement<UnsubscribeRequestServiceData>(this, Identifiers.Unsubscribe, UnsubscribeServiceFunc);
-            References.AddForwardReference(this, unsubscribeServiceElement, unsubscribeServiceElement.Identifier, ReferenceType.Child);
-            return unsubscribeServiceElement;
+            if (!SubscriptionsLock.TryEnterWriteLock(Configuration.Settings.Timeout))
+            {
+                throw new IoTCoreException(ResponseCodes.Locked, Resource1.ElementManagerLocked);
+            }
+
+            try
+            {
+                var id = GenerateSubscriptionId(null, null);
+                if (_subscriptions.ContainsKey(id))
+                {
+                    _subscriptions.Remove(id);
+                }
+                var subscription = new Subscription(id, null, callbackFunc, null, false);
+                _subscriptions.Add(id, subscription);
+            }
+            finally
+            {
+                SubscriptionsLock.ExitWriteLock();
+            }
         }
 
-        private SubscribeResponseServiceData SubscribeServiceFunc(IServiceElement _, SubscribeRequestServiceData data, int? cid)
-        {
-            return Subscribe(data, cid);
-        }
-
-        public SubscribeResponseServiceData Subscribe(SubscribeRequestServiceData data, int? cid = null)
-        {
-            ValidateSubscribeRequestData(data);
-
-            _preSubscribeFunc?.Invoke(this, data, cid);
-
-            var subscriptionId = GenerateSubscriptionId(data.SubscriptionId, cid);
-
-            return new SubscribeResponseServiceData(AddSubscription(new Subscription(data.Callback, null, data.DataToSend, data.Persist, subscriptionId)));
-        }
-
-        public int Subscribe(Action<IEventElement> callbackFunc)
-        {
-            _preSubscribeFunc?.Invoke(this, new SubscribeRequestServiceData(null), null);
-
-            var subscriptionId = GenerateSubscriptionId(null, null);
-
-            return AddSubscription(new Subscription(null, callbackFunc, null, false, subscriptionId));
-        }
-
-        private int GenerateSubscriptionId(int? sid, int? cid)
+        private int GenerateSubscriptionId(int? subscriptionId, int? cid)
         {
             const int autoCreateSubscriptionId = -1;
 
             var id = autoCreateSubscriptionId;
-            if (sid != null)
+            if (subscriptionId != null)
             {
-                id = sid.Value;
+                id = subscriptionId.Value;
             }
             else if (cid != null)
             {
@@ -170,9 +134,9 @@
             if (id == autoCreateSubscriptionId)
             {
                 id = 0;
-                while (id < int.MaxValue)
+                while (id < short.MaxValue)
                 {
-                    if (Subscriptions.Keys.Any(x => x == id))
+                    if (_subscriptions.Values.Any(x => x.Id == id))
                     {
                         id++;
                     }
@@ -185,210 +149,89 @@
             return id;
         }
 
-        private int AddSubscription(Subscription subscription)
+        private Variant UnsubscribeServiceFunc(IServiceElement _, Variant data, int? cid)
         {
-            if (!SubscriptionsLock.TryEnterWriteLock(Configuration.Settings.Timeout))
-            {
-                throw new IoTCoreException(ResponseCodes.Locked, string.Format(Resource1.ElementLocked, Identifier));
-            }
+            var request = Helpers.VariantToObject<UnsubscribeRequestServiceData>(data);
 
-            try
-            {
-                if (Subscriptions.ContainsKey(subscription.SubscriptionId))
-                {
-                    Subscriptions.Remove(subscription.SubscriptionId);
-                }
-                Subscriptions.Add(subscription.SubscriptionId, subscription);
-            }
-            finally
-            {
-                SubscriptionsLock.ExitWriteLock();
-            }
-
-            return subscription.SubscriptionId;
+            Unsubscribe(request, cid);
+            return null;
         }
 
-        private static void ValidateSubscribeRequestData(SubscribeRequestServiceData data)
-        {
-            if (data == null)
-            {
-                throw new IoTCoreException(ResponseCodes.DataInvalid, string.Format(Resource1.ServiceDataEmpty, Identifiers.Subscribe));
-            }
-
-            //if (string.IsNullOrEmpty(data.Callback))
-            //{
-            //    throw new IoTCoreException(ResponseCodes.DataInvalid, string.Format(Resource1.ParameterNotSpecified, Identifiers.Callback));
-            //}
-        }
-
-        private void UnsubscribeServiceFunc(IServiceElement _, UnsubscribeRequestServiceData data, int? cid)
-        {
-            Unsubscribe(data, cid);
-        }
-
-        public void Unsubscribe(UnsubscribeRequestServiceData data, int? cid = null)
-        {
-            ValidateUnsubscribeRequestData(data);
-
-            RemoveSubscription(data, cid);
-
-            _postUnsubscribeFunc?.Invoke(this, data, cid);
-        }
-
-        public void Unsubscribe(int subscriptionId)
-        {
-            Subscriptions.Remove(subscriptionId);
-        }
-
-        public void Unsubscribe(Action<IEventElement> callbackFunc)
-        {
-            if (Subscriptions.Values.Any(x => x.CallbackFunc == callbackFunc))
-            {
-                Subscriptions.RemoveAll(x => x.CallbackFunc == callbackFunc);
-            }
-        }
-
-        private void RemoveSubscription(UnsubscribeRequestServiceData data, int? cid = null)
-        {
-            if (!SubscriptionsLock.TryEnterWriteLock(Configuration.Settings.Timeout))
-            {
-                throw new IoTCoreException(ResponseCodes.Locked, string.Format(Resource1.ElementLocked, Identifier));
-            }
-            try
-            {
-                if (data.SubscriptionId != null)
-                {
-                    if (!Subscriptions.Remove(data.SubscriptionId.Value))
-                    {
-                        throw new ServiceException(ResponseCodes.DataInvalid, string.Format(Resource1.SubscriptionNotFound, data.SubscriptionId.Value));
-                    }
-                }
-                else
-                {
-                    if (Subscriptions.Values.Any(x => x.Callback == data.Callback && x.SubscriptionId == cid))
-                    {
-                        Subscriptions.RemoveAll(x => x.Callback == data.Callback && x.SubscriptionId == cid);
-                    }
-                    else
-                    {
-                        var msg = $"{data.Callback} - {cid}";
-                        throw new ServiceException(ResponseCodes.DataInvalid, string.Format(Resource1.SubscriptionNotFound, msg));
-                    }
-                }
-            }
-            finally
-            {
-                SubscriptionsLock.ExitWriteLock();
-            }
-        }
-
-        private static void ValidateUnsubscribeRequestData(UnsubscribeRequestServiceData data)
+        public virtual void Unsubscribe(UnsubscribeRequestServiceData data, int? cid = null)
         {
             if (data == null)
             {
                 throw new IoTCoreException(ResponseCodes.DataInvalid, string.Format(Resource1.ServiceDataEmpty, Identifiers.Unsubscribe));
             }
 
-            //if (string.IsNullOrEmpty(data.Callback))
-            //{
-            //    throw new IoTCoreException(ResponseCodes.DataInvalid, string.Format(Resource1.ParameterNotSpecified, Identifiers.Callback));
-            //}
+            RemoveSubscription(data, cid);
         }
 
-        public void RaiseEvent()
+        protected void RemoveSubscription(UnsubscribeRequestServiceData data, int? cid)
         {
-            if (!SubscriptionsLock.TryEnterReadLock(Configuration.Settings.Timeout))
+            if (!SubscriptionsLock.TryEnterWriteLock(Configuration.Settings.Timeout))
             {
-                throw new IoTCoreException(ResponseCodes.Locked, string.Format(Resource1.ElementLocked, Identifier));
+                throw new IoTCoreException(ResponseCodes.Locked, Resource1.ElementManagerLocked);
             }
 
             try
             {
-                foreach (var subscription in Subscriptions.Values)
+                if (data.SubscriptionId != null)
                 {
-                    var payload = new Dictionary<string, CodeDataPair>();
-                    if (subscription.DataToSend != null && subscription.DataToSend.Count > 0)
+                    if (!_subscriptions.Remove(data.SubscriptionId.Value))
                     {
-                        if (!_elementManager.Lock.TryEnterReadLock(Configuration.Settings.Timeout))
-                        {
-                            throw new IoTCoreException(ResponseCodes.Locked, Resource1.ElementManagerLocked);
-                        }
-                        try
-                        {
-                            foreach (var item in subscription.DataToSend)
-                            {
-                                // ToDo: Use element manager GetElementByAddress. How avoid deadlock in treechanged event?
-                                var element = _elementManager.GetElementByAddress(Helpers.RemoveDeviceName(item));
-                                if (element is IDataElement dataElement)
-                                {
-                                    try
-                                    {
-                                        payload.Add(item, new CodeDataPair(ResponseCodes.Success, dataElement.Value));
-                                    }
-                                    catch (IoTCoreException iotCoreException)
-                                    {
-                                        payload.Add(item, new CodeDataPair(iotCoreException.Code, null));
-                                    }
-                                    catch
-                                    {
-                                        payload.Add(item, new CodeDataPair(ResponseCodes.InternalError, null));
-                                    }
-                                }
-                            }
-                        }
-                        finally
-                        {
-                            _elementManager.Lock.ExitReadLock();
-                        }
+                        throw new IoTCoreException(ResponseCodes.DataInvalid, string.Format(Resource1.SubscriptionNotFound, data.SubscriptionId.Value));
                     }
-                    
-                    if (Uri.TryCreate(subscription.Callback, UriKind.Absolute, out var uri))
+                }
+                else
+                {
+                    if (_subscriptions.Values.Any(x => x.Callback == data.Callback && x.Id == cid))
                     {
-                        var eventMessage = new EventMessage(subscription.SubscriptionId,
-                            uri.LocalPath,
-                            Helpers.ToJson(new EventServiceData(Interlocked.Increment(ref _eventNumber), Address, payload, subscription.SubscriptionId)));
-                        try
-                        {
-                            _logger?.Debug($"Send event to {subscription.Callback}");
-                            _messageSender.SendEvent(new Uri(subscription.Callback), eventMessage);
-                        }
-                        catch (Exception e)
-                        {
-                            _logger?.Error(string.Format(Resource1.SendEventFailed, subscription.Callback, e.Message));
-                        }
+                        _subscriptions.RemoveAll(x => x.Callback == data.Callback && x.Id == cid);
                     }
                     else
                     {
-                        if (!string.IsNullOrEmpty(subscription.Callback))
-                        {
-                            var element = _elementManager.GetElementByAddress(Helpers.RemoveDeviceName(subscription.Callback));
-                            if (element is ISetterServiceElement<EventServiceData> serviceElement)
-                            {
-                                serviceElement.Invoke(new EventServiceData(Interlocked.Increment(ref _eventNumber), Address, payload, subscription.SubscriptionId), null);
-                            }
-                        }
+                        throw new IoTCoreException(ResponseCodes.DataInvalid, string.Format(Resource1.SubscriptionNotFound, $"{data.Callback} - {cid}"));
                     }
-
-                    subscription.CallbackFunc?.Invoke(this);
                 }
             }
-
             finally
             {
-                SubscriptionsLock.ExitReadLock();
+                SubscriptionsLock.ExitWriteLock();
             }
         }
 
-        protected override void Dispose(bool disposing)
+        public virtual void Unsubscribe(Action<IEventElement> callbackFunc)
         {
-            _elementManager = null;
-            _messageSender = null;
-            _logger = null;
+            RemoveSubscription(callbackFunc);
+        }
 
-            _preSubscribeFunc = null;
-            _postUnsubscribeFunc = null;
+        protected void RemoveSubscription(Action<IEventElement> callbackFunc)
+        {
+            if (!SubscriptionsLock.TryEnterWriteLock(Configuration.Settings.Timeout))
+            {
+                throw new IoTCoreException(ResponseCodes.Locked, Resource1.ElementManagerLocked);
+            }
 
-            base.Dispose(disposing);
+            try
+            {
+                var subscriptionId = _subscriptions.FirstOrDefault(x => x.Value.CallbackFunc == callbackFunc).Key;
+                _subscriptions.Remove(subscriptionId);
+            }
+            finally
+            {
+                SubscriptionsLock.ExitWriteLock();
+            }
+        }
+
+        public bool HasSubscription(Action<IEventElement> callbackFunc)
+        {
+            return _subscriptions.Any(item => item.Value.CallbackFunc == callbackFunc);
+        }
+
+        public void RaiseEvent()
+        {
+            RaiseEventFunc?.Invoke(this, new SubscriptionEventArgs(Interlocked.Increment(ref _eventNumber)));
         }
     }
 }

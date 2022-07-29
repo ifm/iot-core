@@ -1,12 +1,11 @@
 ﻿namespace Sample07
 {
     using System;
-    using System.Collections.Generic;
     using ifmIoTCore;
+    using ifmIoTCore.Common;
     using ifmIoTCore.Elements;
     using ifmIoTCore.Elements.Formats;
     using ifmIoTCore.Elements.Valuations;
-    using ifmIoTCore.Utilities;
 
     internal class Program
     {
@@ -16,18 +15,14 @@
             {
                 var ioTCore = IoTCoreFactory.Create("MyIoTCore");
 
-                var struct1 = ioTCore.CreateStructureElement(ioTCore.Root, 
-                    "struct1", 
-                    null,
-                    new List<string> { "profile1" });
+                var struct1 = new StructureElement("struct1");
+                ioTCore.Root.AddChild(struct1);
 
-                ioTCore.CreateDataElement<float>(struct1, 
-                    "float1", 
+                var float1 = new DataElement<float>("float1",
                     GetFloat1, 
-                    SetFloat1, 
-                    true, 
-                    true, 
+                    SetFloat1,
                     format: new FloatFormat(new FloatValuation(-9.9f, 9.9f, 3)));
+                struct1.AddChild(float1);
             }
             catch (Exception e)
             {
@@ -36,12 +31,12 @@
             Console.ReadLine();
         }
 
-        private static float GetFloat1(IBaseElement element)
+        private static float GetFloat1(IDataElement element)
         {
             return _float1;
         }
 
-        private static void SetFloat1(IBaseElement element, float value)
+        private static void SetFloat1(IDataElement element, float value)
         {
             if (_float1.EqualsWithPrecision(value)) return;
             _float1 = value;

@@ -1,6 +1,6 @@
 ﻿namespace ifmIoTCore.Elements.ServiceData.Requests
 {
-    using Newtonsoft.Json;
+    using Common.Variant;
 
     /// <summary>
     /// Represents the incoming data for a IDeviceElement.GetTree service call
@@ -10,29 +10,37 @@
         /// <summary>
         /// The address of the element that serves as the root element for the requested tree 
         /// </summary>
-        [JsonProperty("adr", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public readonly string Address;
+        [VariantProperty("adr", IgnoredIfNull = true)]
+        public string Address { get; set; }
 
         /// <summary>
         /// The number of tree levels that are requested\n
         /// 0 = no subelements, 1 = 1 level of subelements, 2 = 2 levels of subelements, ...\n
         /// Maximum level = 20
         /// </summary>
-        [JsonProperty("level", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public readonly int? Level;
+        [VariantProperty("level", IgnoredIfNull = true)]
+        public int? Level { get; set; }
 
         /// <summary>
         /// Determines that values of data elements which have a "const_value" profile should be included in the gettree response.
         /// The value will be on the same level as identifier and will have a property name of "value".
         /// </summary>
-        [JsonProperty("expand_const_values", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public bool ExpandConstValues;
+        [VariantProperty("expand_const_values", IgnoredIfNull = true)]
+        public bool ExpandConstValues { get; set; }
 
         /// <summary>
         /// Expand linked elements
         /// </summary>
-        [JsonProperty("expand_links", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public bool ExpandLinks;
+        [VariantProperty("expand_links", IgnoredIfNull = true)]
+        public bool ExpandLinks { get; set; }
+
+        /// <summary>
+        /// The parameterless constructor for the variant converter
+        /// </summary>
+        [VariantConstructor]
+        public GetTreeRequestServiceData()
+        {
+        }
 
         /// <summary>
         /// Initializes a new instance of the class

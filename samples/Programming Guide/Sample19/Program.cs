@@ -2,23 +2,25 @@
 {
     using System;
     using ifmIoTCore;
+    using ifmIoTCore.MessageConverter.Json.Newtonsoft;
     using ifmIoTCore.NetAdapter.Http;
 
     internal class Program
     {
-        static void Main()
+        private static void Main()
         {
+            IIoTCore ioTCore = null;
             HttpServerNetAdapter httpServer = null;
             try
             {
-                var ioTCore = IoTCoreFactory.Create("MyIoTCore");
+                ioTCore = IoTCoreFactory.Create("MyIoTCore");
 
-                httpServer = new HttpServerNetAdapter(ioTCore, 
+                httpServer = new HttpServerNetAdapter(ioTCore,
                     new Uri("http://127.0.0.1:8001"),
-                    new ifmIoTCore.Converter.Json.JsonConverter());
+                    new MessageConverter());
 
                 ioTCore.RegisterServerNetAdapter(httpServer);
-                
+
                 httpServer.Start();
             }
             catch (Exception e)
@@ -27,6 +29,7 @@
             }
             Console.ReadLine();
             httpServer?.Stop();
+            ioTCore?.Dispose();
         }
     }
 }

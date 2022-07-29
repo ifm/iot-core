@@ -1,6 +1,6 @@
 ﻿namespace ifmIoTCore.Profiles.DeviceManagement.ServiceData.Requests
 {
-    using Newtonsoft.Json;
+    using Common.Variant;
 
     /// <summary>
     /// Represents the incoming data for a Unmirror service call
@@ -10,23 +10,31 @@
         /// <summary>
         /// The url of the mirrored IoTCore
         /// </summary>
-        [JsonProperty("uri", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public readonly string Uri;
+        [VariantProperty("uri", IgnoredIfNull = true)]
+        public string RemoteUri { get; set; }
 
         /// <summary>
         /// The alias name for the mirrored IoTCore
         /// </summary>
-        [JsonProperty("alias", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public readonly string Alias;
+        [VariantProperty("alias", IgnoredIfNull = true)]
+        public string Alias { get; set; }
+
+        /// <summary>
+        /// The parameterless constructor for the variant converter
+        /// </summary>
+        [VariantConstructor]
+        public UnmirrorRequestServiceData()
+        {
+        }
 
         /// <summary>
         /// Initializes a new instance of the class
         /// </summary>
-        /// <param name="uri">The url of the mirrored IoTCore</param>
+        /// <param name="remoteUri">The url of the mirrored IoTCore</param>
         /// <param name="alias">The alias name of the mirrored IoTCore</param>
-        public UnmirrorRequestServiceData(string uri, string alias = null)
+        public UnmirrorRequestServiceData(string remoteUri, string alias = null)
         {
-            Uri = uri;
+            RemoteUri = remoteUri;
             Alias = alias;
         }
     }

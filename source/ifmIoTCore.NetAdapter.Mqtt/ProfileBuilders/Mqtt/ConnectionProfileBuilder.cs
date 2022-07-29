@@ -4,7 +4,9 @@
     using System.Collections.Generic;
     using System.ComponentModel;
     using System.Net;
+    using Common;
     using Elements;
+    using Logger;
     using MQTTnet.Protocol;
     using RunControlState;
     using Utilities;
@@ -27,7 +29,7 @@
         private CommChannelSetupProfileProvider _commChannelProfileProvider;
         private MqttCommIfSetupProfileBuilder _mqttCommIfSetupProfileBuilder;
         private string _preset = "stopped";
-        private IDataElement<string> _runControlElement;
+        private IDataElement _runControlElement;
 
 
         /// <summary>
@@ -81,61 +83,56 @@
         /// </summary>
         public void Build()
         {
-            this._commInterfaceStructureElement = _elementManager.CreateStructureElement(_deviceElement.GetElementByIdentifier("connections"), $"mqttconnection_{ Guid.NewGuid() }");
+            this._commInterfaceStructureElement = new StructureElement($"mqttconnection_{ Guid.NewGuid() }");
+            _deviceElement.GetElementByIdentifier("connections").AddChild(_commInterfaceStructureElement);
 
-            this._runControlElement = _elementManager.CreateDataElement<string>(_commInterfaceStructureElement,
-                "status",
+            this._runControlElement = new ReadOnlyDataElement<string>("status",
                 element => this._commInterfaceRunControlStateMachine.CurrentState?.Value?.ToString() ?? "unknown state",
-                null, 
-                true, false,
+                createDataChangedEventElement: true,
                 profiles: new List<string> { "runcontrol" });
-            _runControlElement.DataChangedEventElement = _elementManager.CreateEventElement(_runControlElement, Identifiers.DataChanged);
 
-            var runControlProfileBuilder = new RunControlProfileBuilder(_elementManager,
+            _commInterfaceStructureElement.AddChild(_runControlElement);
+
+            var runControlProfileBuilder = new RunControlProfileBuilder(
                 targetElement: this._runControlElement,
-                startElement: _elementManager.CreateActionServiceElement(_runControlElement,
-                    "start",
+                startElement: new ActionServiceElement("start",
                     (element, i) =>
                         {
                             this.RaiseRunControlEvent(RunControlEventType.Started);
                         }),
-                stopElement: _elementManager.CreateActionServiceElement(_runControlElement,
-                    "stop",
+                stopElement: new ActionServiceElement("stop",
                     (element, i) =>
                         {
                             this.RaiseRunControlEvent(RunControlEventType.Stopped);
                         }),
-                presetElement: _elementManager.CreateDataElement<string>(_runControlElement,
-                    "preset",
+                presetElement: new DataElement<string>("preset",
                 element => this._preset, 
                 (element, s) =>
                         {
-                            if (this._preset == s) return;
-                            switch (s)
+                            if (this._preset == (string)s) return;
+                            switch ((string)s)
                             {
                                 case "running":
-                                    this._preset = s;
+                                    this._preset = (string)s;
                                     return;
                                 case "stopped":
-                                    this._preset = s;
+                                    this._preset = (string)s;
                                     return;
                                 default:
                                     this._log.Error($"Unknown value : '{s}' passed for preset. Valid values are 'running' and 'stopped'.");
                                     return;
                             }
                                 
-                        },
-                true, true),
+                        }
+                ),
                 // ToDo: Add a datachanged event?
 
-                suspendElement: _elementManager.CreateActionServiceElement(_runControlElement,
-                    "suspend",
+                suspendElement: new ActionServiceElement("suspend",
                     (element, i) =>
                         {
                             this.RaiseRunControlEvent(RunControlEventType.Suspend);
                         }),
-                resetElement: _elementManager.CreateActionServiceElement(_runControlElement,
-                    "reset",
+                resetElement: new ActionServiceElement("reset",
                     (element, i) =>
                     {
                         if (this._commInterfaceRunControlStateMachine.IsCurrentState(this._stopped)) return;
@@ -146,10 +143,12 @@
 
             runControlProfileBuilder.Build();
 
-            var commIfSetupElement = _elementManager.CreateStructureElement(_commInterfaceStructureElement,
-                "mqttsetup", 
+            var commIfSetupElement = new StructureElement("mqttsetup", 
                 profiles: new List<string>{ "mqttsetup" });
-            this._mqttCommIfSetupProfileBuilder = new MqttCommIfSetupProfileBuilder(_elementManager, commIfSetupElement);
+
+            _commInterfaceStructureElement.AddChild(commIfSetupElement);
+
+            this._mqttCommIfSetupProfileBuilder = new MqttCommIfSetupProfileBuilder(commIfSetupElement);
             this._mqttCommIfSetupProfileBuilder.Build();
             this._mqttCommIfSetupProfileBuilder.PropertyChanging += CommIfSetupProfileBuilderOnPropertyChanging;
             this._mqttCommIfSetupProfileBuilder.PropertyChanged += CommIfSetupProfileBuilderOnPropertyChanged;
@@ -162,7 +161,7 @@
             var commInterfaceProfileBuilder = new CommInterfaceProfileBuilder(_elementManager, this._commInterfaceStructureElement, this._runControlElement, () => "mqtt", commIfSetupElement, commChannel);
             commInterfaceProfileBuilder.Build();
 
-            var connectionsProfileBuilder = new ConnectionsProfileBuilder(_elementManager, this._deviceElement);
+            var connectionsProfileBuilder = new ConnectionsProfileBuilder(this._deviceElement);
             connectionsProfileBuilder.Build();
 
             _commInterfaceRunControlStateMachine.PropertyChanged += CommInterfaceRunControlStateMachineOnPropertyChanged;
@@ -209,7 +208,7 @@
             var connectionsElement = this._deviceElement.GetElementByProfile("connections");
             if (connectionsElement != null)
             {
-                _elementManager.RemoveElement(connectionsElement, this._commInterfaceStructureElement);
+                connectionsElement.RemoveChild(_commInterfaceStructureElement);
             }
         }
 

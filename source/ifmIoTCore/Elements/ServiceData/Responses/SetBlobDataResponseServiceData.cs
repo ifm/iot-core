@@ -1,6 +1,6 @@
 ﻿namespace ifmIoTCore.Elements.ServiceData.Responses
 {
-    using Newtonsoft.Json;
+    using Common.Variant;
 
     /// <summary>
     /// Represents the outgoing data for a SetBlobData service call
@@ -10,8 +10,16 @@
         /// <summary>
         /// The crc checksum of the current data chunk
         /// </summary>
-        [JsonProperty("crc", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public readonly string Crc;
+        [VariantProperty("crc", IgnoredIfNull = true)]
+        public string Crc { get; }
+
+        /// <summary>
+        /// The parameterless constructor for the variant converter
+        /// </summary>
+        [VariantConstructor]
+        public SetBlobDataResponseServiceData()
+        {
+        }
 
         /// <summary>
         /// Initializes a new instance of the class

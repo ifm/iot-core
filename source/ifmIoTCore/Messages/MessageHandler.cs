@@ -1,14 +1,16 @@
-﻿using System;
-using System.Linq;
-using ifmIoTCore.Elements;
-using ifmIoTCore.Elements.ServiceData.Responses;
-using ifmIoTCore.Exceptions;
-using ifmIoTCore.Resources;
-using ifmIoTCore.Utilities;
-using Newtonsoft.Json.Linq;
-
-namespace ifmIoTCore.Messages
+﻿namespace ifmIoTCore.Messages
 {
+    using System;
+    using System.Linq;
+    using Common;
+    using Common.Variant;
+    using Elements;
+    using Elements.ServiceData.Responses;
+    using Exceptions;
+    using Logger;
+    using Resources;
+    using Utilities;
+
     internal class MessageHandler : IMessageHandler
     {
         private readonly IElementManager _elementManager;
@@ -22,13 +24,8 @@ namespace ifmIoTCore.Messages
             _elementManager = elementManager;
             Logger = logger;
         }
-
-        public ResponseMessage HandleRequest(int cid, string address, JToken data, string reply)
-        {
-            return HandleRequest(new RequestMessage(cid, address, data, reply));
-        }
-
-        public ResponseMessage HandleRequest(RequestMessage message)
+        
+        public Message HandleRequest(Message message)
         {
             if (message == null)
             {
@@ -43,10 +40,33 @@ namespace ifmIoTCore.Messages
                 return response;
             }
 
-            if (Helpers.CheckDeviceName(message.Address, _elementManager.GetRootElement().Identifier))
+            if (string.IsNullOrEmpty(message.Address))
+            {
+                Logger?.Error(Resource1.InvalidMessageAddress);
+                response = CreateErrorResponseMessage(message, 
+                    ResponseCodes.DataInvalid, 
+                    Resource1.InvalidMessageAddress);
+            }
+            else if (!Helpers.CheckDeviceName(message.Address, _elementManager.Root.Identifier))
+            {
+                var errorMessage = string.Format(Resource1.InvalidDeviceName, message.Address);
+                Logger?.Error(errorMessage);
+                response = CreateErrorResponseMessage(message,
+                    ResponseCodes.NotFound,
+                    errorMessage);
+            }
+            else
             {
                 var element = _elementManager.GetElementByAddress(Helpers.RemoveDeviceName(message.Address));
-                if (element != null)
+                if (element == null)
+                {
+                    var errorMessage = string.Format(Resource1.ElementNotFound, message.Address);
+                    Logger?.Error(errorMessage);
+                    response = CreateErrorResponseMessage(message,
+                        ResponseCodes.NotFound,
+                        errorMessage);
+                }
+                else
                 {
                     if (element is IServiceElement serviceElement)
                     {
@@ -56,74 +76,67 @@ namespace ifmIoTCore.Messages
 
                             var data = serviceElement.Invoke(message.Data, message.Cid);
 
-                            response = new ResponseMessage(ResponseCodes.Success,
-                                message.Cid,
-                                string.IsNullOrEmpty(message.Reply) ? message.Address : message.Reply,
-                                data);
+                            response = CreateSuccessResponseMessage(message, data);
                         }
                         catch (IoTCoreException e)
                         {
-                            var errorMessage = string.Format(Resource1.ServiceExecutionFailed, element.Address, e.Message, e.Code);
+                            var errorMessage = string.Format(Resource1.ServiceExecutionFailed, element.Address, e.ErrorInfo.Message);
                             Logger?.Error(errorMessage);
-                            response = new ResponseMessage(e.Code,
-                                message.Cid,
-                                string.IsNullOrEmpty(message.Reply) ? message.Address : message.Reply,
-                                Helpers.ToJson(new ErrorInfoResponseServiceData(errorMessage, e.Code)));
-                        }
-                        catch (ServiceException e)
-                        {
-                            var errorMessage = string.Format(Resource1.ServiceExecutionFailed, element.Address, e.Message, e.Code);
-                            Logger?.Error(errorMessage);
-                            response = new ResponseMessage(e.Code,
-                                message.Cid,
-                                string.IsNullOrEmpty(message.Reply) ? message.Address : message.Reply,
-                                Helpers.ToJson(new ErrorInfoResponseServiceData(errorMessage, e.Code, e.Hint)));
+                            response = CreateErrorResponseMessage(message,
+                                e.ResponseCode,
+                                errorMessage,
+                                e.ErrorInfo.Code,
+                                e.ErrorInfo.Details);
                         }
                         catch (Exception e)
                         {
-                            var errorMessage = string.Format(Resource1.ServiceExecutionFailed, element.Address, e.Message, e.HResult);
+                            var errorMessage = string.Format(Resource1.ServiceExecutionFailed, element.Address, e.Message);
                             Logger?.Error(errorMessage);
-                            response = new ResponseMessage(ResponseCodes.InternalError,
-                                message.Cid,
-                                string.IsNullOrEmpty(message.Reply) ? message.Address : message.Reply,
-                                Helpers.ToJson(new ErrorInfoResponseServiceData(errorMessage)));
+                            response = CreateErrorResponseMessage(message,
+                                ResponseCodes.InternalError,
+                                errorMessage,
+                                e.HResult);
                         }
                     }
                     else
                     {
-                        Logger?.Error($"{string.Format(Resource1.ElementNotService, element.Identifier)} (Code={ResponseCodes.BadRequest})");
-                        response = new ResponseMessage(ResponseCodes.BadRequest,
-                            message.Cid,
-                            string.IsNullOrEmpty(message.Reply) ? message.Address : message.Reply,
-                            Helpers.ToJson(new ErrorInfoResponseServiceData(string.Format(Resource1.ElementNotService, element.Identifier))));
+                        var errorMessage = string.Format(Resource1.ElementNotService, element.Address);
+                        Logger?.Error(errorMessage);
+                        response = CreateErrorResponseMessage(message,
+                            ResponseCodes.BadRequest,
+                            errorMessage);
                     }
                 }
-                else
-                {
-                    Logger?.Error($"{string.Format(Resource1.ElementNotFound, message.Address)} (Code={ResponseCodes.NotFound})");
-                    response = new ResponseMessage(ResponseCodes.NotFound,
-                        message.Cid,
-                        string.IsNullOrEmpty(message.Reply) ? message.Address : message.Reply,
-                        Helpers.ToJson(new ErrorInfoResponseServiceData(string.Format(Resource1.ElementNotFound, message.Address))));
-                }
-            }
-            else
-            {
-                Logger?.Error($"{string.Format(Resource1.InvalidDeviceName, message.Address)} (Code={ResponseCodes.NotFound})");
-                response = new ResponseMessage(ResponseCodes.NotFound,
-                    message.Cid,
-                    string.IsNullOrEmpty(message.Reply) ? message.Address : message.Reply,
-                    Helpers.ToJson(new ErrorInfoResponseServiceData(string.Format(Resource1.InvalidDeviceName, message.Address))));
             }
 
             RaiseResponseMessageEvent(message, response);
 
-            Logger?.Debug($"Send response: code={response.Code}, address={response.Address}, data={response.Data}");
+            Logger?.Debug($"Return response: code={response.Code}, address={response.Address}, data={response.Data}");
 
             return response;
         }
 
-        public void HandleEvent(EventMessage message)
+        private static Message CreateSuccessResponseMessage(Message message, Variant data)
+        {
+            return new Message(ResponseCodes.Success,
+                message.Cid,
+                message.Reply ?? message.Address,
+                data);
+        }
+
+        private static Message CreateErrorResponseMessage(Message message, 
+            int responseCode, 
+            string errorMessage, 
+            int? errorCode = null, 
+            string errorDetails = null)
+        {
+            return new Message(responseCode,
+                message.Cid,
+                message.Reply ?? message.Address,
+                Helpers.VariantFromObject(new ErrorInfoResponseServiceData(errorMessage, errorCode, errorDetails)));
+        }
+
+        public void HandleEvent(Message message)
         {
             if (message == null)
             {
@@ -134,7 +147,7 @@ namespace ifmIoTCore.Messages
 
             RaiseEventMessageEvent(message);
 
-            if (!Helpers.CheckDeviceName(message.Address, _elementManager.GetRootElement().Identifier))
+            if (!Helpers.CheckDeviceName(message.Address, _elementManager.Root.Identifier))
             {
                 throw new IoTCoreException(ResponseCodes.NotFound, string.Format(Resource1.ElementNotFound, message.Address));
             }
@@ -170,9 +183,9 @@ namespace ifmIoTCore.Messages
             }
         }
 
-        private ResponseMessage RaiseRequestMessageEvent(RequestMessage request)
+        private Message RaiseRequestMessageEvent(Message request)
         {
-            ResponseMessage response = null;
+            Message response = null;
             var eventHandlers = RequestMessageReceived?.GetInvocationList();
             if (eventHandlers != null)
             {
@@ -182,32 +195,32 @@ namespace ifmIoTCore.Messages
                     {
                         var args = new RequestMessageEventArgs(request);
                         eventHandler(this, args);
-                        if (args.Response != null)
+                        if (args.ResponseMessage != null)
                         {
-                            response = args.Response;
+                            response = args.ResponseMessage;
                             break;
                         }
                     }
                     catch (Exception e)
                     {
-                        response = new ResponseMessage(ResponseCodes.InternalError,
+                        response = new Message(ResponseCodes.InternalError,
                             request.Cid,
-                            string.IsNullOrEmpty(request.Reply) ? request.Address : request.Reply,
-                            Helpers.ToJson(new ErrorInfoResponseServiceData(e.Message)));
+                            request.Reply ?? request.Address,
+                            Helpers.VariantFromObject(new ErrorInfoResponseServiceData(e.Message)));
                     }
                 }
             }
             return response;
         }
 
-        private void RaiseEventMessageEvent(EventMessage evt)
+        private void RaiseEventMessageEvent(Message eventMessage)
         {
-            EventMessageReceived.Raise(this, new EventMessageEventArgs(evt));
+            EventMessageReceived.Raise(this, new EventMessageEventArgs(eventMessage));
         }
 
-        private void RaiseResponseMessageEvent(RequestMessage request, ResponseMessage response)
+        private void RaiseResponseMessageEvent(Message requestMessage, Message responseMessage)
         {
-            RequestMessageResponded.Raise(this, new RequestMessageEventArgs(request, response));
+            RequestMessageResponded.Raise(this, new RequestMessageEventArgs(requestMessage, responseMessage));
         }
     }
 }

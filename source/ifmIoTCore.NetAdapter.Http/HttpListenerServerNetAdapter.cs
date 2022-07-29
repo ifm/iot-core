@@ -1,6 +1,4 @@
-﻿using System.Threading;
-
-namespace ifmIoTCore.NetAdapter.Http
+﻿namespace ifmIoTCore.NetAdapter.Http
 {
     using System;
     using System.Collections.Generic;
@@ -9,34 +7,37 @@ namespace ifmIoTCore.NetAdapter.Http
     using System.Linq;
     using System.Net;
     using System.Threading.Tasks;
-    using Elements.ServiceData.Responses;
+    using Base;
+    using Common.Variant;
     using Exceptions;
+    using Logger;
     using Messages;
-    using Resources;
-    using Utilities;
 
-    public class HttpListenerServerNetAdapter : EventBasedServerNetAdapterBase
+    public class HttpListenerServerNetAdapter : ServerNetAdapterBase
     {
         private readonly HttpListener _httpListener;
-        private readonly IConverter _converter;
+        private readonly IMessageConverter _converter;
         private readonly ILogger _logger;
         private bool _disposed;
 
-        protected HttpListenerServerNetAdapter(Uri uri, IConverter converter, ILogger logger = null)
+        protected HttpListenerServerNetAdapter(Uri uri, IMessageConverter converter, ILogger logger = null)
         {
             this.Uri = uri ?? throw new ArgumentNullException(nameof(uri));
             this._converter = converter ?? throw new ArgumentNullException(nameof(converter));
-            this.ConverterType = this._converter.Type;
 
             this._logger = logger;
             this._httpListener = new HttpListener();
             this._httpListener.Prefixes.Add($"{uri.Scheme}://{(uri.Host == IPAddress.Any.ToString() ? "*" : uri.Host)}:{uri.Port}/");
         }
 
-        public bool IsListening => this._httpListener?.IsListening ?? false;
-        public override string ConverterType { get; }
+        public override string Scheme => "http";
+
+        public override string Format => _converter.Type;
+
         public override Uri Uri { get; }
-        
+
+        public override bool IsListening => _httpListener.IsListening;
+
         public override void Start()
         {
             if (this.IsListening)
@@ -95,11 +96,11 @@ namespace ifmIoTCore.NetAdapter.Http
                     }
                     else
                     {
-                        var requestMessage = new RequestMessage(1, context.Request.Url.AbsolutePath, null);
+                        var requestMessage = new Message(RequestCodes.Request, 1, context.Request.Url.AbsolutePath, null);
                         var requestMessageEventArgs = new RequestMessageEventArgs(requestMessage);
 
                         this.RaiseRequestReceived(requestMessageEventArgs);
-                        var responseMessage = requestMessageEventArgs.Response;
+                        var responseMessage = requestMessageEventArgs.ResponseMessage;
                         var responseString = this._converter.Serialize(responseMessage);
 
                         context.Response.AddHeader("Access-Control-Allow-Origin", "*");
@@ -116,27 +117,24 @@ namespace ifmIoTCore.NetAdapter.Http
                         context.Request.InputStream.CopyTo(inputStream);
 
                         var requestString = Encoding.UTF8.GetString(inputStream.ToArray());
-                        var message = this._converter.Deserialize<Message>(requestString);
+                        var message = this._converter.Deserialize(requestString);
 
                         string responseString;
                         if (message.Code == RequestCodes.Request)
                         {
-                            var requestMessage = this._converter.Deserialize<RequestMessage>(requestString);
-
-                            var requestMessageEventArgs = new RequestMessageEventArgs(requestMessage);
+                            var requestMessageEventArgs = new RequestMessageEventArgs(message);
                             this.RaiseRequestReceived(requestMessageEventArgs);
-                            var responseMessage = requestMessageEventArgs.Response;
+                            var responseMessage = requestMessageEventArgs.ResponseMessage;
                             responseString = this._converter.Serialize(responseMessage);
                         }
                         else if (message.Code == RequestCodes.Event)
                         {
-                            var eventMessage = this._converter.Deserialize<EventMessage>(requestString);
-                            this.RaiseEventReceived(eventMessage);
+                            this.RaiseEventReceived(message);
                             responseString = string.Empty;
                         }
                         else
                         {
-                            throw new ServiceException(ResponseCodes.BadRequest, string.Format(Resource1.InvalidMessageCode, message.Code));
+                            throw new IoTCoreException(ResponseCodes.BadRequest, $"Invalid message code {message.Code}");
                         }
 
                         context.Response.ContentType = this._converter.ContentType;
@@ -155,8 +153,15 @@ namespace ifmIoTCore.NetAdapter.Http
             }
             catch (Exception e)
             {
-                ResponseMessage responseMessage;
-                if (e is HttpListenerException listenerException)
+                Message responseMessage;
+                if (e is IoTCoreException ioTCoreException)
+                {
+                    responseMessage = new Message(ioTCoreException.ResponseCode,
+                        0,
+                        null,
+                        CreateErrorResponse(ioTCoreException.ErrorInfo.Message, ioTCoreException.ErrorInfo.Code, ioTCoreException.ErrorInfo.Details));
+                }
+                else if (e is HttpListenerException listenerException)
                 {
                     if (listenerException.ErrorCode < 100 || listenerException.ErrorCode > 999)
                     {
@@ -168,12 +173,12 @@ namespace ifmIoTCore.NetAdapter.Http
                         context.Response.StatusCode = listenerException.ErrorCode;
                     }
                     
-                    responseMessage = new ResponseMessage(
-                        listenerException.ErrorCode,
+                    responseMessage = new Message(listenerException.ErrorCode,
                         0,
                         null,
-                        Helpers.ToJson(new ErrorInfoResponseServiceData(listenerException.Message)));
-                } else if (e is AggregateException aggregateException)
+                        CreateErrorResponse(listenerException.Message, listenerException.ErrorCode));
+                } 
+                else if (e is AggregateException aggregateException)
                 {
                     var errorMessages = new List<string>();
                     if (aggregateException.InnerException?.Message != null)
@@ -181,7 +186,7 @@ namespace ifmIoTCore.NetAdapter.Http
                         errorMessages.Add(aggregateException.InnerException.Message);
                     }
 
-                    if (aggregateException.InnerExceptions != null && aggregateException.InnerExceptions.Any())
+                    if (aggregateException.InnerExceptions.Any())
                     {
                         foreach (var innerException in aggregateException.InnerExceptions)
                         {
@@ -189,21 +194,18 @@ namespace ifmIoTCore.NetAdapter.Http
                         }
                     }
 
-                    var serviceException = new ServiceException(ResponseCodes.InternalError, $"{aggregateException.Message}, {string.Join(",", errorMessages)}");
-
-                    responseMessage = new ResponseMessage(serviceException.Code/*ResponseCodes.ServiceFailed IoTCore 2.0*/,
+                    responseMessage = new Message(ResponseCodes.InternalError,
                         0,
                         null,
-                        Helpers.ToJson(new ErrorInfoResponseServiceData(e.Message, serviceException.Code, serviceException.Hint)));
+                        CreateErrorResponse(aggregateException.Message, ResponseCodes.InternalError, string.Join(",", errorMessages)));
                 }
                 else
                 {
                     context.Response.StatusCode = 500;
-                    responseMessage = new ResponseMessage(
-                        ResponseCodes.InternalError, 
-                        0, 
+                    responseMessage = new Message(ResponseCodes.InternalError,
+                        0,
                         null,
-                        Helpers.ToJson(new ErrorInfoResponseServiceData(e.Message)));
+                        CreateErrorResponse(e.Message, ResponseCodes.InternalError));
                 }
 
                 var responseString = this._converter.Serialize(responseMessage);
@@ -220,6 +222,22 @@ namespace ifmIoTCore.NetAdapter.Http
             {
                 _logger?.Error($"HttpListenerException occured when closing response outputstream of httpcontext. The message was: '{e.Message}'. The httplistener errorcode was: '{e.ErrorCode}'.");
             }
+        }
+
+        private static Variant CreateErrorResponse(string msg, int? code = null, string details = null)
+        {
+            var ret = new VariantObject();
+
+            ret.Add("msg", new VariantValue(msg));
+            if (code != null)
+            {
+                ret.Add("code", new VariantValue(code.Value));
+            }
+            if (details != null)
+            {
+                ret.Add("details", new VariantValue(details));
+            }
+            return ret;
         }
 
         private void Listen()

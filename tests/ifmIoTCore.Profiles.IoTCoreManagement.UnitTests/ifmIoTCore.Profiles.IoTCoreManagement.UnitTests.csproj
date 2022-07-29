@@ -1,25 +1,21 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
-    <TargetFrameworks>net48;net5.0</TargetFrameworks>
+    <TargetFrameworks>net48;net5.0;net6.0</TargetFrameworks>
     <IsPackable>false</IsPackable>
     <LangVersion>default</LangVersion>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="nunit" Version="3.13.2" />
-    <PackageReference Include="NUnit3TestAdapter" Version="4.0.0">
+    <PackageReference Include="NUnit3TestAdapter" Version="4.1.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.11.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.0.0" />
   </ItemGroup>
-
   <ItemGroup>
-    <ProjectReference Include="..\..\source\ifmIoTCore.Converter.Json\ifmIoTCore.Converter.Json.csproj" />
     <ProjectReference Include="..\..\source\ifmIoTCore.Logging.Log4Net\ifmIoTCore.Logging.Log4Net.csproj" />
+    <ProjectReference Include="..\..\source\ifmIoTCore.MessageConverter.Json.Newtonsoft\ifmIoTCore.MessageConverter.Json.Newtonsoft.csproj" />
     <ProjectReference Include="..\..\source\ifmIoTCore.Profiles.IoTCoreManagement\ifmIoTCore.Profiles.IoTCoreManagement.csproj" />
     <ProjectReference Include="..\..\source\ifmIoTCore\ifmIoTCore.csproj" />
   </ItemGroup>
-
 </Project>

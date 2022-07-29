@@ -1,4 +1,5 @@
-﻿using MQTTnet.Diagnostics.Logger;
+﻿using ifmIoTCore.Common.Variant;
+using MQTTnet.Diagnostics.Logger;
 
 namespace ifmIoTCore.NetAdapter.Mqtt
 {
@@ -32,10 +33,25 @@ namespace ifmIoTCore.NetAdapter.Mqtt
             return client;
         }
 
-        public static IMqttClientOptions BuildOptions(IPAddress serverIp, int port)
+        public static IMqttClientOptions BuildOptions(IPAddress serverIp, int port, UserInfo userInfo = null)
         {
-            return new MqttClientOptionsBuilder()
-                .WithTcpServer(serverIp.ToString(), port).Build();
+            var options = new MqttClientOptionsBuilder();
+            options = options.WithTcpServer(serverIp.ToString(), port);
+
+            if (string.IsNullOrEmpty(userInfo?.User)) return options.Build();
+
+            if (string.IsNullOrEmpty(userInfo.Password))
+            {
+                options = options.WithCredentials(userInfo.User);
+                options = options.WithClientId(userInfo.User);
+            }
+            else
+            {
+                options = options.WithCredentials(userInfo.User, userInfo.Password);
+                options = options.WithClientId(userInfo.User);
+            }
+
+            return options.Build();
         }
 
         public static IMqttClientOptions BuildOptions(IPAddress serverIp, int port, string clientId)
@@ -61,7 +77,7 @@ namespace ifmIoTCore.NetAdapter.Mqtt
             MqttClient client,
             string publishTopic,
             string replyTopic,
-            IConverter converter, 
+            IMessageConverter converter, 
             TimeSpan timeout, 
             CancellationToken token)
         {
@@ -85,7 +101,7 @@ namespace ifmIoTCore.NetAdapter.Mqtt
                         responseMessage = 
                             publishresult.ReasonCode == MqttClientPublishReasonCode.Success
                                 ? new Message(ResponseCodes.Success, 0, req.Address, null) 
-                                : new ResponseMessage(ResponseCodes.InternalError, 0, req.Address, publishresult.ReasonCode.ToString());
+                                : new Message(ResponseCodes.InternalError, 0, req.Address, (VariantValue)publishresult.ReasonCode.ToString());
                     }
                     else
                     {
@@ -118,7 +134,7 @@ namespace ifmIoTCore.NetAdapter.Mqtt
                                 new MqttApplicationMessageReceivedHandlerDelegate(m =>
                                 {
                                     var responseString = Encoding.UTF8.GetString(m.ApplicationMessage.Payload);
-                                    var tempResponseMessage = converter.Deserialize<Message>(responseString);
+                                    var tempResponseMessage = converter.Deserialize(responseString);
                                     if (tempResponseMessage.Code != 10)
                                     {
                                         manualResetEvent.Set();
@@ -161,6 +177,12 @@ namespace ifmIoTCore.NetAdapter.Mqtt
                                     select e;
                                 throw new AggregateException(exceptions);
                             }
+
+                            if (!manualResetEvent.IsSet && responseMessage == null)
+                            {
+                                throw new TimeoutException(
+                                    $"The response of the request {req.ToString()} did not arrive in the timeout window.");
+                            }
                         }
                     }
 
@@ -176,20 +198,23 @@ namespace ifmIoTCore.NetAdapter.Mqtt
 
             if (connectionsElement == null)
             {
-                connectionsElement = elementManager.CreateStructureElement(deviceElement, "connections", profiles:new List<string>{"connections"});
+                connectionsElement = new StructureElement("connections", profiles:new List<string>{"connections"});
+                deviceElement.AddChild(connectionsElement);
             }
 
             var mqttConnectionElement = connectionsElement.GetElementByIdentifier("mqttconnection");
             if (mqttConnectionElement == null)
             {
-                mqttConnectionElement = elementManager.CreateStructureElement(connectionsElement, "mqttconnection", profiles: new List<string>());
+                mqttConnectionElement = new StructureElement("mqttconnection", profiles: new List<string>());
+                connectionsElement.AddChild(mqttConnectionElement);
             }
 
             var mqttSetupElement = mqttConnectionElement.GetElementByIdentifier("mqttsetup");
 
             if (mqttSetupElement == null)
             {
-                mqttSetupElement = elementManager.CreateStructureElement(mqttConnectionElement, "mqttsetup", profiles:new List<string>{ "mqttsetup"});
+                mqttSetupElement = new StructureElement("mqttsetup", profiles:new List<string>{ "mqttsetup"});
+                mqttConnectionElement.AddChild(mqttSetupElement);
             }
 
             var qos = mqttSetupElement.GetElementByIdentifier("qos");
@@ -197,12 +222,29 @@ namespace ifmIoTCore.NetAdapter.Mqtt
             if (qos == null)
             {
                 int qosValue = 0;
-                qos = elementManager.CreateDataElement<int>(mqttSetupElement, "qos", element => qosValue, (element, i) =>
+                qos = new DataElement<int>("qos", element => qosValue, (element, i) =>
                 {
-                    if (qosValue == i) return;
-                    qosValue = i;
-                } ,true, true, profiles:new List<string>{"parameter"}, format:new IntegerEnumFormat(new IntegerEnumValuation(new Dictionary<string, string>{{"0", "Qos 0"},{"1", "Qos 1"}, {"2", "Qos 2"}})));
+                    if (qosValue == (int)i) return;
+                    qosValue = (int)i;
+                }, profiles:new List<string>{"parameter"}, format:new IntegerEnumFormat(new IntegerEnumValuation(new Dictionary<string, string>{{"0", "Qos 0"},{"1", "Qos 1"}, {"2", "Qos 2"}})));
                 // ToDo: Add a datachanged event?
+
+                mqttSetupElement.AddChild(qos);
+            }
+
+            var keepAlive = mqttSetupElement.GetElementByIdentifier("keepalive");
+
+            if (keepAlive == null)
+            {
+                int keepAliveValue = 0;
+                keepAlive = new DataElement<int>("keepalive", element => keepAliveValue,
+                    (element, i) =>
+                    {
+                        if (keepAliveValue == (int)i) return;
+                        keepAliveValue = (int)i;
+                    }, format: new IntegerFormat(new IntegerValuation(int.MinValue, int.MaxValue)));
+
+                mqttSetupElement.AddChild(keepAlive);
             }
 
         }

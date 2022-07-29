@@ -1,11 +1,14 @@
-﻿using ifmIoTCore.Converter.Json;
-using ifmIoTCore.NetAdapter.Http;
+﻿using ifmIoTCore.Common.Variant;
 
 namespace ifmIoTCore.UnitTests
 {
     using System;
+    using System.Linq;
+    using ifmIoTCore.Elements;
     using ifmIoTCore.Elements.ServiceData.Requests;
+    using ifmIoTCore.Elements.ServiceData.Responses;
     using NUnit.Framework;
+    using Utilities;
 
     [TestFixture]
     public class QueryTreeTests
@@ -13,35 +16,54 @@ namespace ifmIoTCore.UnitTests
         [Test]
         public void TestQueryTree()
         {
-            var ioTCore1 = IoTCoreFactory.Create("id0", null);
-            using var clientNetAdapterFactory = new HttpClientNetAdapterFactory(new JsonConverter());
-            ioTCore1.RegisterClientNetAdapterFactory(clientNetAdapterFactory);
-            var ioTCore = ioTCore1;
+            var ioTCore = IoTCoreFactory.Create("id0");
 
-            var structure0 = ioTCore.CreateStructureElement(ioTCore.Root, "structure0");
-            var data0 = ioTCore.CreateDataElement<object>(structure0, "data0", (element) => { return null; });
+            var structure0 = new StructureElement("structure0");
+            ioTCore.Root.AddChild(structure0);
+            var data0 = new ReadOnlyDataElement<object>("data0", (element) => { return null; });
+            structure0.AddChild(data0);
 
             var testProfile = Guid.NewGuid().ToString();
             structure0.AddProfile(testProfile);
 
-            var result = ioTCore.Root.QueryTree(new QueryTreeRequestServiceData(profile:testProfile));
-            Assert.Contains(structure0.Address, result.Addresses);
+            var queryTreeService = ioTCore.Root.QueryTreeServiceElement;
 
-            var result2 = ioTCore.Root.QueryTree(new QueryTreeRequestServiceData(profile: "notExisting"));
 
-            Assert.AreEqual(0, result2.Addresses.Count);
+            var queryResult1 = queryTreeService.Invoke(Variant.FromObject(new QueryTreeRequestServiceData(profile: testProfile)));
+            var queryResult1Data = Variant.ToObject<QueryTreeResponseServiceData>(queryResult1);
+            Assert.Contains(structure0.Address, queryResult1Data.Addresses);
 
-            var result3 = ioTCore.Root.QueryTree(new QueryTreeRequestServiceData(type: "data"));
-            Assert.Contains(data0.Address, result3.Addresses);
+            var queryResult2 = queryTreeService.Invoke(Variant.FromObject(new QueryTreeRequestServiceData(profile: "notExisting")));
+            var queryResult2Data = Variant.ToObject<QueryTreeResponseServiceData>(queryResult2);
+            Assert.AreEqual(0, queryResult2Data.Addresses.Count);
 
-            var result4 = ioTCore.Root.QueryTree(new QueryTreeRequestServiceData());
+            var queryResult3 = queryTreeService.Invoke(Variant.FromObject(new QueryTreeRequestServiceData(type: "data")));
+            var queryResult3Data = Variant.ToObject<QueryTreeResponseServiceData>(queryResult3);
+            Assert.Contains(data0.Address, queryResult3Data.Addresses);
 
+            var queryResult4 = queryTreeService.Invoke(Variant.FromObject(new QueryTreeRequestServiceData()));
+            var queryResult4Data = Variant.ToObject<QueryTreeResponseServiceData>(queryResult4);
             foreach (var item in ioTCore.Root.Subs)
             {
-                Assert.Contains(item.Address, result4.Addresses);
+                Assert.Contains(item.Address, queryResult4Data.Addresses);
             }
-            ioTCore.RemoveClientNetAdapterFactory(clientNetAdapterFactory);
-            clientNetAdapterFactory.Dispose();
+        }
+
+        [Test]
+        public void TestQueryTreeByName()
+        {
+            var ioTCore = IoTCoreFactory.Create("id0");
+            var structure = new StructureElement("someidentifier");
+            ioTCore.Root.AddChild(structure);
+
+            var queryTreeService = ioTCore.Root.QueryTreeServiceElement;
+
+            var result = queryTreeService.Invoke(Variant.FromObject(new QueryTreeRequestServiceData(identifier: "someidentifier")));
+            var resultData = Variant.ToObject<QueryTreeResponseServiceData>(result);
+            var foundItem = resultData.Addresses.FirstOrDefault();
+
+            Assert.NotNull(foundItem);
+            Assert.AreEqual(structure.Address, foundItem);
         }
     }
 }

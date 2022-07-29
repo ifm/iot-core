@@ -1,20 +1,33 @@
-﻿namespace ifmIoTCore.Profiles.IoTCoreManagement.ServiceData.Requests
+﻿
+namespace ifmIoTCore.Profiles.IoTCoreManagement.ServiceData.Requests
 {
-    using Newtonsoft.Json;
+    using Common.Variant;
 
     public class RemoveLinkRequestServiceData
     {
-        [JsonProperty("adr", Required = Required.Always)]
-        public readonly string SourceAddress;
+        [VariantProperty("adr", Required = true)]
+        public string SourceAddress { get; set; }
 
-        [JsonProperty("target_adr", Required = Required.Default, NullValueHandling = NullValueHandling.Ignore)]
-        public readonly string TargetAddress;
+        [VariantProperty("target_adr", Required = true)]
+        public string TargetAddress { get; set; }
 
+        [VariantProperty("identifier", Required = false)]
+        public string Identifier { get; set; }
 
-        public RemoveLinkRequestServiceData(string sourceAddress, string targetAddress = null)
+        [VariantProperty("persist", Required = false)]
+        public bool Persist { get; set; }
+
+        [VariantConstructor]
+        public RemoveLinkRequestServiceData()
         {
+        }
+
+        public RemoveLinkRequestServiceData(string identifier, string sourceAddress, string targetAddress, bool persist = false)
+        {
+            Identifier = identifier;
             SourceAddress = sourceAddress;
             TargetAddress = targetAddress;
+            Persist = persist;
         }
     }
 }

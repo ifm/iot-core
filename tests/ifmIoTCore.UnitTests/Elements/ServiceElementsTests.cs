@@ -1,5 +1,8 @@
-﻿namespace ifmIoTCore.UnitTests.Elements
+﻿using ifmIoTCore.Common.Variant;
+
+namespace ifmIoTCore.UnitTests.Elements
 {
+    using ifmIoTCore.Elements;
     using NUnit.Framework;
     using Messages;
     using Newtonsoft.Json.Linq;
@@ -11,72 +14,77 @@
         public void ServiceElement_Invoked_InputOutput_UserData1UserData2()
         {
             // Given
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            var struct1 = ioTCore.CreateStructureElement(ioTCore.Root, "struct1");
-            object argtest=null;
-            var service = ioTCore.CreateServiceElement<complexData,complexData>(struct1,
-                "ServiceElement_InOut_UserData1UserData2",
-                (sender, inputarg, cid) => { argtest = inputarg;  return new complexData();  });
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+            var struct1 = new StructureElement("struct1");
+            ioTCore.Root.AddChild(struct1, true);
+            object argtest =null;
+            var service = new ServiceElement("ServiceElement_InOut_UserData1UserData2",
+                (sender, inputarg, cid) => { argtest = inputarg;  return Variant.FromObject(new complexData());  });
+            struct1.AddChild(service, true);
 
             // When
-            Message response = ioTCore.HandleRequest(new RequestMessage(cid: 1, address: "/struct1/ServiceElement_InOut_UserData1UserData2", JToken.FromObject(new complexData())));
+            var response = ioTCore.HandleRequest(new Message(RequestCodes.Request, 1, "/struct1/ServiceElement_InOut_UserData1UserData2", Variant.FromObject(new complexData())));
             
             // Then
-            Assert.That(argtest, Is.EqualTo(new complexData()));
-            Assert.That(response.Data.ToObject<complexData>(), Is.EqualTo(new complexData()));
+            Assert.That(Variant.ToObject<complexData>((VariantObject)argtest), Is.EqualTo(new complexData()));
+            Assert.That(Variant.ToObject<complexData>(response.Data), Is.EqualTo(new complexData()));
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T211")]
         public void ServiceElement_Invoked_InputOutput_BoolString()
         {
             // Given
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            var struct1 = ioTCore.CreateStructureElement(ioTCore.Root, "struct1");
-            object argtest=null;
-            var service = ioTCore.CreateServiceElement<bool,string>(struct1,
-                "ServiceElement_InOut_BoolString",
-                (sender, inputarg, cid) => { argtest = inputarg;  return "Forty Two!";  });
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+            var struct1 = new StructureElement("struct1");
+            ioTCore.Root.AddChild(struct1, true);
+            object argtest =null;
+            var service = new ServiceElement("ServiceElement_InOut_BoolString",
+                (sender, inputarg, cid) => { argtest = inputarg;  return new VariantValue("Forty Two!");  });
+            struct1.AddChild(service, true);
 
             // When
-            Message response = ioTCore.HandleRequest(new RequestMessage(cid: 1, address: "/struct1/ServiceElement_InOut_BoolString", JToken.FromObject(true)));
+            var response = ioTCore.HandleRequest(new Message(RequestCodes.Request, 1, "/struct1/ServiceElement_InOut_BoolString", Variant.FromObject(true)));
             
             // Then
-            Assert.That(argtest, Is.EqualTo(true));
-            Assert.That((string)response.Data, Is.EqualTo("Forty Two!"));
+            Assert.That((bool)((VariantValue)argtest), Is.EqualTo(true));
+            Assert.That((string)(VariantValue)response.Data, Is.EqualTo("Forty Two!"));
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T211")]
         public void ServiceElement_Invoked_InputOutput_IntInt()
         {
             // Given
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            var struct1 = ioTCore.CreateStructureElement(ioTCore.Root, "struct1");
-            object argtest=null;
-            var service = ioTCore.CreateServiceElement<int,int>(struct1,
-                "ServiceElement_InOut_IntInt",
-                (sender, inputarg, cid) => { argtest = inputarg;  return 43;  });
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+            var struct1 = new StructureElement("struct1");
+            ioTCore.Root.AddChild(struct1, true);
+            object argtest =null;
+            var service = new ServiceElement("ServiceElement_InOut_IntInt",
+                (sender, inputarg, cid) => { argtest = inputarg;  return new VariantValue(43);  });
+            struct1.AddChild(service, true);
 
             // When
-            Message response = ioTCore.HandleRequest(new RequestMessage(cid: 1, address: "/struct1/ServiceElement_InOut_IntInt", JToken.FromObject(42)));
+            var response = ioTCore.HandleRequest(new Message(RequestCodes.Request, 1, "/struct1/ServiceElement_InOut_IntInt", Variant.FromObject(42)));
             
             // Then
-            Assert.That(argtest, Is.EqualTo(42));
-            Assert.That((int)response.Data, Is.EqualTo(43));
+            Assert.That((int)(VariantValue)argtest, Is.EqualTo(42));
+            Assert.That((int)(VariantValue)response.Data, Is.EqualTo(43));
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T211")]
         public void ActionServiceElement_Invoked_NoInput_NoOutput()
         {
             // Given
-            using var ioTCore = IoTCoreFactory.Create("ioTCore", null);
-            var struct1 = ioTCore.CreateStructureElement(ioTCore.Root, "struct1");
-            var serviceInvoked=false;
+            using var ioTCore = IoTCoreFactory.Create("ioTCore");
+            var struct1 = new StructureElement("struct1");
+            ioTCore.Root.AddChild(struct1, true);
+            var serviceInvoked =false;
             Assert.IsFalse(serviceInvoked);
-            var service = ioTCore.CreateActionServiceElement(struct1, "actionService",
+            var service = new ActionServiceElement("actionService",
                 (sender,cid) => { serviceInvoked = true; });
+            struct1.AddChild(service, true);
 
             // When
-            Message response = ioTCore.HandleRequest(0, "/struct1/actionService");
+            var response = ioTCore.HandleRequest(0, "/struct1/actionService");
             
             // Then
             Assert.That(serviceInvoked, Is.True);

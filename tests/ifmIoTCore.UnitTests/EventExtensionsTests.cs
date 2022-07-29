@@ -2,6 +2,7 @@
 {
     using System;
     using System.Threading;
+    using Common;
     using Utilities;
     using Messages;
     using NUnit.Framework;
@@ -65,7 +66,7 @@
 
                 TestEvent3 += OnTestEvent3;
 
-                RaiseTestEvent3(new RequestMessageEventArgs(new RequestMessage(1,"/", null), null));
+                RaiseTestEvent3(new RequestMessageEventArgs(new Message(RequestCodes.Request, 1, "/", null), null));
 
                 manualResetEventSlim.Wait(TimeSpan.FromMilliseconds(50));
 

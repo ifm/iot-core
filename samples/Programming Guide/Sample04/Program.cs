@@ -1,8 +1,8 @@
 ﻿namespace Sample04
 {
     using System;
-    using System.Collections.Generic;
     using ifmIoTCore;
+    using ifmIoTCore.Elements;
 
     internal class Program
     {
@@ -12,12 +12,12 @@
             {
                 var ioTCore = IoTCoreFactory.Create("MyIoTCore");
 
-                var struct1 = ioTCore.CreateStructureElement(ioTCore.Root, 
-                    "struct1", 
-                    null,
-                    new List<string> { "profile1" });
+                var struct1 = new StructureElement("struct1");
+                ioTCore.Root.AddChild(struct1);
 
-                ioTCore.CreateEventElement(struct1, "event1");
+                var event1 = new EventElement("event1");
+                struct1.AddChild(event1);
+
             }
             catch (Exception e)
             {

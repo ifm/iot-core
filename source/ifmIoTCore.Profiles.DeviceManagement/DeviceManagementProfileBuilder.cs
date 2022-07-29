@@ -3,43 +3,42 @@
     using System;
     using System.Collections.Generic;
     using System.Linq;
-    using Elements;
-    using Elements.ServiceData.Responses;
+    using Base;
+    using Common.Variant;
     using Exceptions;
+    using ifmIoTCore.Elements;
     using Messages;
     using ServiceData.Requests;
-    using Utilities;
 
-    public class DeviceManagementProfileBuilder
+    public class DeviceManagementProfileBuilder : BaseProfileBuilder
     {
         public const string ProfileName = "device_management";
 
-        private readonly IIoTCore _ioTCore;
         private readonly IBaseElement _remoteFolder;
 
         private readonly List<ProxyDevice> _devices = new List<ProxyDevice>();
 
-        public DeviceManagementProfileBuilder(IIoTCore iotCore)
+        public DeviceManagementProfileBuilder(ProfileBuilderConfiguration config): base(config)
         {
-            _ioTCore = iotCore;
-            _remoteFolder = _ioTCore.Root.GetElementByIdentifier(Identifiers.Remote);
+            
+            _remoteFolder = IoTCore.Root.GetElementByIdentifier(Identifiers.Remote);
         }
-
-        public void Build()
+        
+        public override void Build()
         {
             var element = GetDeviceManagementElement();
 
-            _ioTCore.CreateSetterServiceElement<MirrorRequestServiceData>(element, "mirror", MirrorFunc);
-            _ioTCore.CreateSetterServiceElement<UnmirrorRequestServiceData>(element, "unmirror", UnmirrorFunc);
-            _ioTCore.RaiseTreeChanged();
+            element.AddChild(new SetterServiceElement("mirror", MirrorFunc), false);
+            element.AddChild(new SetterServiceElement("unmirror", UnmirrorFunc), false);
+            IoTCore.Root.RaiseTreeChanged(element);
         }
 
         private IBaseElement GetDeviceManagementElement()
         {
-            var deviceManagement = _ioTCore.Root.GetElementByProfile(ProfileName);
+            var deviceManagement = IoTCore.Root.GetElementByProfile(ProfileName);
             if (deviceManagement == null)
             {
-                deviceManagement = _ioTCore.CreateStructureElement(_ioTCore.Root, ProfileName, profiles: new List<string> { ProfileName });
+                deviceManagement = IoTCore.Root.AddChild(new StructureElement(ProfileName, profiles: new List<string> { ProfileName }), false);
             }
             else
             {
@@ -51,47 +50,40 @@
             return deviceManagement;
         }
 
-        private void MirrorFunc(IBaseElement element, MirrorRequestServiceData data, int? cid = null)
+        private void MirrorFunc(IBaseElement element, Variant data, int? cid = null)
         {
-            Mirror(data);
+            var request = data != null ? Variant.ToObject<MirrorRequestServiceData>(data) : null;
+            Mirror(request);
         }
 
         public IBaseElement Mirror(MirrorRequestServiceData data)
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
-            if (string.IsNullOrEmpty(data.Uri)) throw new ArgumentNullException(nameof(data.Uri));
+            if (string.IsNullOrEmpty(data.RemoteUri)) throw new ArgumentNullException(nameof(data.RemoteUri));
 
-            var remoteTree = GetRemoteTree(new Uri(data.Uri), data.Authentication);
+            var device = new ProxyDevice(IoTCore.ClientNetAdapterManager, 
+                data.RemoteUri, 
+                data.Alias,
+                data.Callback, 
+                data.CacheTimeout, 
+                data.AuthenticationInfo);
 
-            var device = new ProxyDevice(_ioTCore, _ioTCore, _ioTCore, _remoteFolder,
-                data.Uri, data.CallbackUri, data.Alias, data.CacheTimeout, data.Authentication);
-            device.CreateElements(remoteTree);
+            device.CreateElements(_remoteFolder);
+
             _devices.Add(device);
             return device.RootElement;
         }
 
-        private GetTreeResponseServiceData GetRemoteTree(Uri remoteUri,
-            AuthenticationInfo authenticationInfo)
+        private void UnmirrorFunc(IBaseElement element, Variant data, int? cid = null)
         {
-            var response = _ioTCore.SendRequest(remoteUri, new RequestMessage(1, $"/{Identifiers.GetTree}", null, null, authenticationInfo));
-            if (ResponseCodes.IsError(response.Code))
-            {
-                throw new ServiceException(response.Code, response.Data.ToString());
-            }
-
-            return Helpers.FromJson<GetTreeResponseServiceData>(response.Data);
-        }
-
-
-        private void UnmirrorFunc(IBaseElement element, UnmirrorRequestServiceData data, int? cid = null)
-        {
-            Unmirror(data);
+            var request = data != null ? Variant.ToObject<UnmirrorRequestServiceData>(data) : null;
+            Unmirror(request);
         }
 
         public void Unmirror(UnmirrorRequestServiceData data)
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
-            if (data.Uri == null && data.Alias == null) throw new ServiceException(ResponseCodes.DataInvalid, "An uri or and alias must be provided");
+            if (data.RemoteUri == null && data.Alias == null) throw new IoTCoreException(ResponseCodes.DataInvalid, "An uri or and alias must be provided");
 
             ProxyDevice device = null;
             if (!string.IsNullOrEmpty(data.Alias))
@@ -100,16 +92,16 @@
             }
             if (device == null)
             {
-                if (!string.IsNullOrEmpty(data.Uri))
+                if (!string.IsNullOrEmpty(data.RemoteUri))
                 {
-                    device = _devices.FirstOrDefault(x => x.Uri == data.Uri);
+                    device = _devices.FirstOrDefault(x => x.RemoteUri == data.RemoteUri);
                 }
             }
             if (device == null)
             {
-                throw new ServiceException(ResponseCodes.NotFound, $"No mirrored device with Uri {data.Uri} or alias {data.Alias} found");
+                throw new IoTCoreException(ResponseCodes.NotFound, $"No mirrored device with Uri {data.RemoteUri} or alias {data.Alias} found");
             }
-            device.RemoveElements();
+            device.RemoveElements(_remoteFolder);
             _devices.Remove(device);
         }
     }

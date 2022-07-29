@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "DemoMqtt": {
+      "commandName": "Project",
+      "commandLineArgs": "--mqtt-broker mqtt://192.168.83.247:1883 -u http://127.0.0.1:8090"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <AssemblyVersion>2.1.6</AssemblyVersion>
+    <Version>2.1.6</Version>
+    <Company>ifm ecomatic gmbh</Company>
+    <Copyright>Copyright © ifm ecomatic gmbh. All rights reserved.</Copyright>
+    <LangVersion>8</LangVersion>
+    <RootNamespace>ifmIoTCore</RootNamespace>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ifmIoTCore.Common\ifmIoTCore.Common.csproj" />
+  </ItemGroup>
+</Project>

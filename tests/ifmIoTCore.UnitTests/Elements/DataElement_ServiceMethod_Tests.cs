@@ -1,4 +1,7 @@
-﻿namespace ifmIoTCore.UnitTests.Elements
+﻿using ifmIoTCore.Common.Variant;
+using ifmIoTCore.Elements.ServiceData.Responses;
+
+namespace ifmIoTCore.UnitTests.Elements
 {
 using System;
 using NUnit.Framework;
@@ -26,43 +29,35 @@ using ifmIoTCore.Elements.Valuations;
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T7")]
-        public void Create_GetData_ServiceElement_UsingFlagIn_CreateDataEventElement()
+        public void ReadOnlyDataElement_CreatesAndAccepts_getdata_No_setdata()
         {
-            // Given: iot core instance and DataElement is being created 
-
-            // When: createGetDataServiceElement flag is set to false
-            string dataelementid_NoGetData = Guid.NewGuid().ToString("N");
-            testiotcore.CreateDataElement<string>(testiotcore.Root, dataelementid_NoGetData, createGetDataServiceElement: false);
-            // Then: getdata service element is not created, dataelement/getdata returns 404 NotFound
-            Assert.Null(testiotcore.GetElementByAddress($"/{dataelementid_NoGetData}/getdata"));
-            Assert.That(testiotcore.HandleRequest(1,$"/{dataelementid_NoGetData}/getdata").Code, Is.EqualTo(ResponseCodes.NotFound));
-
-            // When: createGetDataServiceElement flag is set to true
-            string dataelementid_GetData = Guid.NewGuid().ToString("N");
-            testiotcore.CreateDataElement<string>(testiotcore.Root, dataelementid_GetData, createGetDataServiceElement: true);
-            // Then: getdata service element is created, dataelement/getdata returns 200 Ok 
-            Assert.NotNull(testiotcore.GetElementByAddress($"/{dataelementid_GetData}/getdata"));
-            Assert.That(testiotcore.HandleRequest(1, $"/{dataelementid_GetData}/getdata").Code, Is.EqualTo(ResponseCodes.Success));
+            // Given: iot core instantiated
+            // When: readonlydataelement created with getdatafunc
+            var dataelementId = Guid.NewGuid().ToString("N");
+            const int everything = 42;
+            var readonlyDataElement = testiotcore.Root.AddChild(new ReadOnlyDataElement<int>(dataelementId, getDataFunc: (s)=>everything));
+            // Then: dataelement/getdata request works as expected
+            Assert.That(testiotcore.HandleRequest(1,$"/{dataelementId}/getdata").Code, Is.EqualTo(ResponseCodes.Success));
+            Assert.That(testiotcore.HandleRequest(1, $"/{dataelementId}/getdata").Data.AsVariantObject()["value"].ToObject<int>(), Is.EqualTo(everything));
+            // Then: dataelement/setdata request gives error 404 NotFound
+            Assert.That(testiotcore.HandleRequest(1,$"/{dataelementId}/setdata", new VariantValue(everything+1)).Code, Is.EqualTo(ResponseCodes.NotFound));
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T7")]
-        public void Create_SetData_ServiceElement_UsingFlagIn_CreateDataEventElement()
+        public void WriteOnlyDataElement_CreatesAndAccepts_getdata_No_setdata()
         {
-            // Given: iot core instance and DataElement is being created 
+            // Given: iot core instaitated 
+            // When: writeonlydataelement created with setdatafunc
+            var dataelementId = Guid.NewGuid().ToString("N");
+            int setvalue = 0; const int everything = 42;
+            var writeonlyDataElement = testiotcore.Root.AddChild(new WriteOnlyDataElement<int>(dataelementId, setDataFunc: (s, p) => setvalue = p));
 
-            // When: createSetDataServiceElement flag is set to false
-            string dataelementid_NoSetData = Guid.NewGuid().ToString("N");
-            testiotcore.CreateDataElement<string>(testiotcore.Root, dataelementid_NoSetData, createSetDataServiceElement: false);
-            // Then: setdata service element is not created, dataelement/setdata returns 404 NotFound
-            Assert.Null(testiotcore.GetElementByAddress($"/{dataelementid_NoSetData}/setdata"));
-            Assert.That(testiotcore.HandleRequest(1,$"/{dataelementid_NoSetData}/setdata").Code, Is.EqualTo(ResponseCodes.NotFound));
-
-            // When: createSetDataServiceElement flag is set to true
-            string dataelementid_SetData = Guid.NewGuid().ToString("N");
-            testiotcore.CreateDataElement<string>(testiotcore.Root, dataelementid_SetData, createSetDataServiceElement: true);
-            // Then: setdata service element is created, dataelement/setdata returns 200 Ok 
-            Assert.NotNull(testiotcore.GetElementByAddress($"/{dataelementid_SetData}/setdata"));
-            Assert.That(testiotcore.HandleRequest(1,$"/{dataelementid_SetData}/setdata", JToken.Parse("{'newvalue':null}")).Code, Is.EqualTo(ResponseCodes.Success));
+            // Then: dataelement/setdata request works as expected
+            var response = testiotcore.HandleRequest(1, $"/{dataelementId}/setdata", data:new VariantObject(){{"value", new VariantValue(everything)}});
+            Assert.That(response.Code, Is.EqualTo(ResponseCodes.Success));
+            Assert.That(setvalue, Is.EqualTo(everything));
+            // Then: dataelement/getdata request gives error 404 NotFound
+            Assert.That(testiotcore.HandleRequest(1,$"/{dataelementId}/getdata").Code, Is.EqualTo(ResponseCodes.NotFound));
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T7")]
@@ -72,12 +67,12 @@ using ifmIoTCore.Elements.Valuations;
             
             // When: DataElement created
             string dataelementid = Guid.NewGuid().ToString("N");
-            var dataelement = testiotcore.CreateDataElement<string>(testiotcore.Root, dataelementid);
+            var dataelement = new DataElement<string>(dataelementid, null, null, createDataChangedEventElement: true);
+            testiotcore.Root.AddChild(dataelement, true);
             // Then: event element is not created by default 
-            Assert.Null(testiotcore.GetElementByAddress($"/{dataelementid}/{Identifiers.DataChanged}"));
+            Assert.NotNull(testiotcore.GetElementByAddress($"/{dataelementid}/{Identifiers.DataChanged}"));
 
             // When: datachangedevent element is created
-            dataelement.DataChangedEventElement = testiotcore.CreateEventElement(dataelement, Identifiers.DataChanged);
             // Then: datachangedevent element is accessible. 
             Assert.AreEqual(dataelement.DataChangedEventElement, testiotcore.GetElementByAddress($"/{dataelementid}/{Identifiers.DataChanged}"));
         }
@@ -95,6 +90,25 @@ using ifmIoTCore.Elements.Valuations;
             Assert.Fail("TODO: create failing test");
         }
 
+        [Test, Property("TestCaseKey", "IOTCS-T7")]
+        public void DataElement_Creation_CanSetValue_getdata_accessible()
+        {
+            // Given: iot core instance 
+            
+            // When: DataElement created with default value
+            string dataelementid = Guid.NewGuid().ToString("N");
+            const int AnswerOfEverything = 42;
+            testiotcore.Root.AddChild(new DataElement<int>(dataelementid, value: AnswerOfEverything), true);
+            // Then: default value is immediately aviailable to iot core tree, getdata, setdata services
+            Assert.That((int)(VariantValue)Variant.ToObject<GetDataResponseServiceData>(testiotcore.HandleRequest(1, $"/{dataelementid}/getdata").Data).Value, Is.EqualTo(AnswerOfEverything));
+            
+            // When: DataElement created with default value for another data type
+            string dataelementid2 = Guid.NewGuid().ToString("N");
+            const bool Yes = true;
+            testiotcore.Root.AddChild(new DataElement<bool>(dataelementid2, value: Yes), true);
+            // Then: default value is immediately available to iot core tree, getdata, setdata services
+            Assert.That((bool)(VariantValue)Variant.ToObject<GetDataResponseServiceData>(testiotcore.HandleRequest(1, $"/{dataelementid2}/getdata").Data).Value, Is.EqualTo(Yes));
+        }
     }
 
     [TestFixture]
@@ -105,7 +119,7 @@ using ifmIoTCore.Elements.Valuations;
         [SetUp]
         public void CreateIotCoreInstance()
         {
-            testiotcore = IoTCoreFactory.Create("testiotcore", null);
+            testiotcore = IoTCoreFactory.Create("testiotcore");
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T41")]
@@ -113,59 +127,69 @@ using ifmIoTCore.Elements.Valuations;
         {
             const string stringValue = "hellotest";
             const int intValue = 10;
-            var stringDataElement = testiotcore.CreateDataElement<string>(testiotcore.Root, "string1",
+            var stringDataElement = new ReadOnlyDataElement<string>("string1",
                 (sender) => stringValue,
                 format: new IntegerFormat(new IntegerValuation(0)));
-            var int2DataElement = testiotcore.CreateDataElement<int>(testiotcore.Root, "int1",
+            testiotcore.Root.AddChild(stringDataElement, true);
+
+            var int2DataElement = new ReadOnlyDataElement<int>("int1",
                 (sender) => intValue,
                 format: new StringFormat(new StringValuation(0, 100)));
+            testiotcore.Root.AddChild(int2DataElement, true);
 
             // When: DataElement has defined Value
-            Assert.That(stringDataElement.Value, Is.EqualTo(stringValue));
-            Assert.That(int2DataElement.Value, Is.EqualTo(intValue));
+            Assert.That((string)stringDataElement.Value.AsVariantValue(), Is.EqualTo(stringValue));
+            Assert.That((int)int2DataElement.Value.AsVariantValue(), Is.EqualTo(intValue));
 
             // Then: getdata request returns the same thing as DataElement Value.
-            Assert.That(testiotcore.HandleRequest(1, "/string1/getdata").Data.Value<string>("value"), Is.EqualTo(stringValue));
-            Assert.That(testiotcore.HandleRequest(1, "/int1/getdata").Data.Value<int>("value"), Is.EqualTo(intValue));
+            Assert.That((string)(VariantValue)Variant.ToObject<GetDataResponseServiceData>(testiotcore.HandleRequest(1, "/string1/getdata").Data).Value, Is.EqualTo(stringValue));
+            Assert.That((int)(VariantValue)Variant.ToObject<GetDataResponseServiceData>(testiotcore.HandleRequest(1, "/int1/getdata").Data).Value, Is.EqualTo(intValue));
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T41")]
         public void DataElement_GetDataMethod_getDataFuncHandler_AnythingReturned_isGivenBack_toDataSide()
         {
-            var nullDataElement = testiotcore.CreateDataElement<object>(testiotcore.Root, "null1",
-                (s) => null, 
+            var nullDataElement = new ReadOnlyDataElement<object>("null1",
+                (s) => null,
                 format: new StringFormat(new StringValuation(0, 100)));
-            Assert.That(nullDataElement.Value, Is.EqualTo(null));
-            Assert.That(testiotcore.HandleRequest(1, "/null1/getdata").Data.Value<string>("value"), Is.EqualTo(null));
+            testiotcore.Root.AddChild(nullDataElement, true);
+
+            Assert.AreEqual(nullDataElement.Value, null);
+
+            Assert.That((string)(VariantValue)Variant.ToObject<GetDataResponseServiceData>(testiotcore.HandleRequest(1, "/null1/getdata").Data).Value, Is.EqualTo(null));
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T46")]
         public void DataElement_SetData_NoHandler_SetValue_Success()
         {
-            var testDataElement = testiotcore.CreateDataElement<string>(testiotcore.Root, "string1",
+            var testDataElement = new DataElement<string>("string1",
                 format: new StringFormat(new StringValuation(0, 100)));
+            testiotcore.Root.AddChild(testDataElement);
 
             const string stringValue = "hellotest";
-            testDataElement.Value = stringValue;
-            Assert.True(testDataElement.Value == stringValue);
+            testDataElement.Value = (VariantValue)stringValue;
+            Assert.True((string)(VariantValue)testDataElement.Value == stringValue);
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T46")]
         public void DataElement_SetDataMethod_invokes_setDataFuncHandler_WhichGetsNewValue()
         {
             object setDataValue = null;
-            var testDataElement = testiotcore.CreateDataElement<object>(testiotcore.Root, "string1",
-                null,
+            var testDataElement = new WriteOnlyDataElement<string>("string1",
                 (senderElement, incomingValue) =>
                 {
                     setDataValue = incomingValue;
                 },
                 format: new StringFormat(new StringValuation(0, 100)));
+            testiotcore.Root.AddChild(testDataElement, true);
+
             Assert.IsNull(setDataValue);
 
             const string stringValue = "hellotest";
-            testiotcore.HandleRequest(1, "/string1/setdata",JToken.Parse($"{{'newvalue':'{stringValue}'}}")); //testDataElement.Value = "hellotest";
-            Assert.That(setDataValue as string, Is.EqualTo(stringValue));
+
+            testiotcore.HandleRequest(1, "/string1/setdata", new VariantObject() {{"newvalue", new VariantValue($"{stringValue}")}}); 
+            //testDataElement.Value = "hellotest";
+            Assert.That(setDataValue, Is.EqualTo(stringValue));
         }
 
     }
@@ -178,20 +202,19 @@ using ifmIoTCore.Elements.Valuations;
         {
             //Given: Dataelement with caching enabled with specific timeout
             const string elementName = "cached_element";
-            var testDataElement = new DataElement<string>(null, elementName,
-                sender => "getdata_called",
+            var testDataElement = new DataElement<string>(elementName, sender => "getdata_called", 
                 null,
                 format: new StringFormat(new StringValuation(0, 100)),
                 cacheTimeout: TimeSpan.FromMinutes(1));
 
             //Given: first time cache is loaded 
-            testDataElement.Value = elementName;
+            testDataElement.Value = (VariantValue)elementName;
 
             //When: getdata called on caching enabled dataelement before cache timeout
             //Then: cached value is used without using getdata handler
             var beforeTimeout = testDataElement.Value;
-            Assert.That(beforeTimeout, Is.Not.EqualTo("getdata_called"));
-            Assert.That(beforeTimeout, Is.EqualTo(elementName)); // extra assert for readability
+            Assert.That((string)beforeTimeout.AsVariantValue(), Is.Not.EqualTo("getdata_called"));
+            Assert.That((string)beforeTimeout.AsVariantValue(), Is.EqualTo(elementName)); // extra assert for readability
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T188")]
@@ -199,20 +222,20 @@ using ifmIoTCore.Elements.Valuations;
         {
             //Given: Dataelement with caching enabled with specific timeout
             const string elementName = "cached_element";
-            var testDataElement = new DataElement<string>(null, elementName,
-                sender => "getdata_called",
+            var testDataElement = new DataElement<string>(elementName, sender => "getdata_called",
+                null,
                 format: new StringFormat(new StringValuation(0, 100)),
                 cacheTimeout: TimeSpan.FromMilliseconds(100));
 
             //Given: first time cache is loaded 
-            testDataElement.Value = elementName;
+            testDataElement.Value = (VariantValue)elementName;
 
             //When: getdata called on caching enabled dataelement after cache timeout
             //Then: refreshed value is returned using getdata handler
             System.Threading.Thread.Sleep(100);
             var afterTimeout = testDataElement.Value;
-            Assert.That(afterTimeout, Is.EqualTo("getdata_called"));
-            Assert.That(afterTimeout, Is.Not.EqualTo(elementName)); // extra assert for readability
+            Assert.That((string)afterTimeout.AsVariantValue(), Is.EqualTo("getdata_called"));
+            Assert.That((string)afterTimeout.AsVariantValue(), Is.Not.EqualTo(elementName)); // extra assert for readability
         }
 
         [Test, Property("TestCaseKey", "IOTCS-T189"), Property("TestCaseKey", "IOTCS-T190")]
@@ -220,30 +243,30 @@ using ifmIoTCore.Elements.Valuations;
         {
             //Given: Dataelement with caching enabled with specific timeout
             const string elementName = "cached_element";
-            var cachedElement = new DataElement<string>(null, elementName,
-                sender => "getdata_called",
+            var cachedElement = new DataElement<string>(elementName, sender => "getdata_called",
+                null,
                 format: new StringFormat(new StringValuation(0, 100)),
                 cacheTimeout: TimeSpan.FromMinutes(1));
 
             //Given: Dataelement with caching disabled using null
             const string elementName2 = "uncached_element";
             var uncachedelementvalue = elementName2;
-            var uncachedElement = new DataElement<string>(null, elementName2,
-                sender => uncachedelementvalue,
+            var uncachedElement = new DataElement<string>(elementName2, sender => uncachedelementvalue,
                 (sender,value) => { uncachedelementvalue = value; },
+                
                 format: new StringFormat(new StringValuation(0, 100)));
 
             //Given: first time cache is loaded for cached element
-            cachedElement.Value = elementName;
+            cachedElement.Value = (VariantValue)elementName;
             //When: getdata called on cached element before timeout
             //Then: cached value is returned without using getdata handler
             var afterTimeout = cachedElement.Value;
-            Assert.That(afterTimeout, Is.Not.EqualTo("getdata_called"));
+            Assert.That((string)afterTimeout.AsVariantValue(), Is.Not.EqualTo("getdata_called"));
 
             //When: uncached element value is updated (setdata) and retrieved (getdata)
             //Then: latest value (not the cached value) is returned using getdata handler
-            uncachedElement.Value = "1";
-            Assert.That(uncachedElement.Value, Is.EqualTo("1"));
+            uncachedElement.Value = (VariantValue)"1";
+            Assert.That((string)uncachedElement.Value.AsVariantValue(), Is.EqualTo("1"));
         }
 
     }
