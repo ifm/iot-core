@@ -1,0 +1,14 @@
+<Solution>
+  <Project Path="source/ifm.IoTCore.Common/ifm.IoTCore.Common.csproj" />
+  <Project Path="source/ifm.IoTCore.Contracts/ifm.IoTCore.Contracts.csproj" />
+  <Project Path="source/ifm.IoTCore.ElementManager.Contracts/ifm.IoTCore.ElementManager.Contracts.csproj" />
+  <Project Path="source/ifm.IoTCore.EventSender.Contracts/ifm.IoTCore.EventSender.Contracts.csproj" />
+  <Project Path="source/ifm.IoTCore.Message/ifm.IoTCore.Message.csproj" />
+  <Project Path="source/ifm.IoTCore.MessageConverter.Contracts/ifm.IoTCore.MessageConverter.Contracts.csproj" />
+  <Project Path="source/ifm.IoTCore.MessageDispatcher.Contracts/ifm.IoTCore.MessageDispatcher.Contracts.csproj" />
+  <Project Path="source/ifm.IoTCore.NetAdapter.Contracts/ifm.IoTCore.NetAdapter.Contracts.csproj" />
+  <Project Path="source/ifm.IoTCore.NetAdapterManager.Contracts/ifm.IoTCore.NetAdapterManager.Contracts.csproj" />
+  <Project Path="source/ifm.IoTCore.PersistenceManager.Contracts/ifm.IoTCore.PersistenceManager.Contracts.csproj" />
+  <Project Path="source/ifm.IoTCore.UserManager.Contracts/ifm.IoTCore.UserManager.Contracts.csproj" />
+  <Project Path="source/ifm.IoTCore/ifm.IoTCore.csproj" />
+</Solution>
