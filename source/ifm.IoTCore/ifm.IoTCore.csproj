@@ -1,0 +1,49 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFramework>netstandard2.0</TargetFramework>
+		<AssemblyVersion>7.1.0</AssemblyVersion>
+		<Version>7.1.0</Version>
+		<Company>ifm ecomatic gmbh</Company>
+		<Product>ifm IoT-Core</Product>
+		<Description>The package contains the IoT-Core base classes.</Description>
+		<Copyright>Copyright © ifm ecomatic gmbh. All rights reserved.</Copyright>
+		<Authors>ESI Middleware</Authors>
+		<LangVersion>latest</LangVersion>
+		<IsPackable>true</IsPackable>
+		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+		<PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+		<DebugType>embedded</DebugType>
+		<EmbedAllSources>true</EmbedAllSources>
+		<!--<GenerateDocumentationFile>true</GenerateDocumentationFile>-->
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(CI_BUILD)' == 'true'">
+		<ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+	</PropertyGroup>
+	<ItemGroup>
+		<None Include="..\..\LICENSE.txt" Pack="true" PackagePath="." />
+		<None Include="..\..\NOTICE.md" Pack="true" PackagePath="." />
+		<None Include="..\..\Release Notes.txt" Pack="True" PackagePath="." />
+	</ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="ifm.Common" Version="1.0.0" />
+		<PackageReference Include="ifm.Logger.Contracts" Version="1.1.1" />
+		<PackageReference Include="ifm.DataStore.Contracts" Version="1.0.5" />
+	</ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\ifm.IoTCore.Common\ifm.IoTCore.Common.csproj" />
+		<ProjectReference Include="..\ifm.IoTCore.Contracts\ifm.IoTCore.Contracts.csproj" />
+	</ItemGroup>
+	<ItemGroup>
+		<Compile Update="Resources\Resource1.Designer.cs">
+			<DependentUpon>Resource1.resx</DependentUpon>
+			<DesignTime>True</DesignTime>
+			<AutoGen>True</AutoGen>
+		</Compile>
+	</ItemGroup>
+	<ItemGroup>
+		<EmbeddedResource Update="Resources\Resource1.resx">
+			<LastGenOutput>Resource1.Designer.cs</LastGenOutput>
+			<Generator>PublicResXFileCodeGenerator</Generator>
+		</EmbeddedResource>
+	</ItemGroup>
+</Project>
