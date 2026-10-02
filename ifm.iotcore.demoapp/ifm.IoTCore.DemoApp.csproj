@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Company>ifm ecomatic gmbh</Company>
+    <Product>ifm IoT-Core</Product>
+    <Description>A sample application for ifm IoT-Core.</Description>
+    <Copyright>Copyright © ifm ecomatic gmbh. All rights reserved.</Copyright>
+    <Authors>ESI Middleware</Authors>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommandLineParser" Version="2.9.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ifm.datastore\ifm.DataStore\ifm.DataStore.csproj" />
+    <ProjectReference Include="..\ifm.iotcore.networkadapter.http\source\ifm.IoTCore.NetAdapter.Http.Client\ifm.IoTCore.NetAdapter.Http.Client.csproj" />
+    <ProjectReference Include="..\ifm.iotcore.networkadapter.http\source\ifm.IoTCore.NetAdapter.Http.Profile.HttpServer\ifm.IoTCore.NetAdapter.Http.Profile.HttpServer.csproj" />
+    <ProjectReference Include="..\ifm.iotcore.networkadapter.http\source\ifm.IoTCore.NetAdapter.Http.Server\ifm.IoTCore.NetAdapter.Http.Server.csproj" />
+    <ProjectReference Include="..\ifm.iotcore.profile.deviceinfo\source\ifm.IoTCore.Profile.DeviceInfo\ifm.IoTCore.Profile.DeviceInfo.csproj" />
+    <ProjectReference Include="..\ifm.iotcore.profile.devicetag\ifm.IoTCore.Profile.DeviceTag\ifm.IoTCore.Profile.DeviceTag.csproj" />
+    <ProjectReference Include="..\ifm.iotcore\source\ifm.IoTCore.MessageConverter.Json\ifm.IoTCore.MessageConverter.Json.csproj" />
+    <ProjectReference Include="..\ifm.iotcore\source\ifm.IoTCore\ifm.IoTCore.csproj" />
+    <ProjectReference Include="..\ifm.logger\ifm.Logger\ifm.Logger.csproj" />
+  </ItemGroup>
+
+</Project>

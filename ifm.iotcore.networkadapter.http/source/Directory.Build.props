@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+   <DebugType>embedded</DebugType>
+   <EmbedAllSources>true</EmbedAllSources>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CI_BUILD)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+</Project>

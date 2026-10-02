@@ -1,0 +1,487 @@
+***************************************************************************************************
+ifm IoTCore.NET
+Version 7.1.0
+Released yyyy/yy/dd
+***************************************************************************************************
+
+What's new
+---------------------------------------------------------------------------------------------------
+- Added simple message dispatcher
+- Added tree changes collection to tree changed event element
+
+
+***************************************************************************************************
+ifm IoTCore.NET
+Version 7.0.0
+Released 2026/07/01
+***************************************************************************************************
+
+What's new
+---------------------------------------------------------------------------------------------------
+- Removed obsolete raise tree change flag from element manager
+
+
+***************************************************************************************************
+ifm IoTCore.NET
+Version 6.1.x
+Released 2026/05/06
+***************************************************************************************************
+
+What's new
+---------------------------------------------------------------------------------------------------
+- Added token based user authentication
+- Added role based service authorization
+  - Added user roles Administrator, Maintainer, Observer, Anonymous
+  - Support assign user role to service
+- Added device element interface and class
+- Generate service format if not provided
+- Optionally expand service format in get tree response
+- Collect tree changes in element manager and individual elements
+- Allow case insensitive message parameters in json message
+
+Bug fixes
+---------------------------------------------------------------------------------------------------
+
+
+***************************************************************************************************
+ifm IoTCore.NET
+Version 6.0.0
+Released 2026/01/23
+***************************************************************************************************
+
+What's new
+---------------------------------------------------------------------------------------------------
+- Single implementation project and nuget
+- Moved devicetag profile to separate project
+- Added tree changed actions data element, which collects all tree changes
+- Allow named floating point literals
+- Added service access restrictions depending on password status
+
+
+***************************************************************************************************
+ifm IoTCore.NET
+2024.1 Version 5.4.1
+Released 2026/01/08
+***************************************************************************************************
+
+What's new
+---------------------------------------------------------------------------------------------------
+- Added license information
+- Added debug support to packages
+
+
+***************************************************************************************************
+ifm IoTCore.NET
+2024.1 Version 5.4.0
+Released 2025/12/12
+***************************************************************************************************
+
+What's new
+---------------------------------------------------------------------------------------------------
+- Added service format
+- Added type elements and format references
+
+Bug fixes
+---------------------------------------------------------------------------------------------------
+
+
+***************************************************************************************************
+ifm IoTCore.NET
+2024.1 Version 5.3.6
+Released 2025/12/09
+***************************************************************************************************
+
+What's new
+---------------------------------------------------------------------------------------------------
+- Create data element format if not provided
+- Introduced map format
+
+Bug fixes
+---------------------------------------------------------------------------------------------------
+
+
+***************************************************************************************************
+ifm IoTCore.NET
+2024.1 Version 5.3.4
+Released 2025/11/08
+***************************************************************************************************
+
+What's new
+---------------------------------------------------------------------------------------------------
+- Added authentication request flag to message dispatcher
+- Force password change 
+
+Bug fixes
+---------------------------------------------------------------------------------------------------
+
+
+***************************************************************************************************
+ifm IoTCore.NET
+2024.1 Version 5.3.2
+Released 2025/07/02
+***************************************************************************************************
+
+What's new
+---------------------------------------------------------------------------------------------------
+- Added devicetag profile
+
+Bug fixes
+---------------------------------------------------------------------------------------------------
+- Decode escaped "[,]" characters in element address
+
+
+***************************************************************************************************
+ifm IoTCore.NET
+2024.1 Version 5.2.15
+Released 2024/12/19
+***************************************************************************************************
+
+What's new
+---------------------------------------------------------------------------------------------------
+- Added optional event counter data element to event element
+- Added event counter data element to treechanged event element 
+
+Bug fixes
+---------------------------------------------------------------------------------------------------
+- Fixed several bugs to conform with latest IoTCore API 2.0 specification
+
+
+***************************************************************************************************
+ifm IoTCore.NET
+2024.1 Version 5.2.0
+Released 2024/10/18
+***************************************************************************************************
+
+What's new
+---------------------------------------------------------------------------------------------------
+- Simplified persistence manager interface
+- Changed service handler interfaces to allow to return optional response codes
+
+Bug fixes
+---------------------------------------------------------------------------------------------------
+- Fixed several bugs to conform with latest IoTCore API 2.0 specification
+
+
+***************************************************************************************************
+ifm IoTCore.NET
+2023.1 Version 4.2.23
+Released 2024/29/01
+***************************************************************************************************
+
+Bug fixes
+---------------------------------------------------------------------------------------------------
+- Return error codes for invalid message data
+  * Message invalid -> 400 (bad request)
+  * Service data invalid -> 416 (out of range), 422 (data invalid)
+- Return 404 (not found) for invalid address not 400 (bad request)
+- Validate that datatosend list has no duplicates
+  * Affects getdatamulti, setdatamulti, subscribe services
+- 
+
+***************************************************************************************************
+ifm IoTCore.NET
+2023.1 Version 4.2.20
+Released 2024/01/02
+***************************************************************************************************
+
+Bug fixes
+---------------------------------------------------------------------------------------------------
+- Fixed bug in VariantValue explicit converter when value is null.
+- In querytree allow no service data.
+- Allow response message without adr field to allow conversion of non conforming message.
+- Fix bug in message converter when non conforming message has msg field in message, but no error.
+
+
+***************************************************************************************************
+ifm IoTCore.NET
+2023.1 Version 4.2.17
+Released 2023/12/20
+***************************************************************************************************
+ 
+What's new
+---------------------------------------------------------------------------------------------------
+A) IoTCore
+  * Cleanup namespaces.
+    - Follow pattern company.product.component.
+  * Support network API version 2.0.
+  * Introduced microservice architecture.
+    - Separated basic services and managers in IoTCore assembly into multiple assemblies.
+  * Added user manager.
+    - Supports simple user name and password check.
+  * Added persistence manager.
+    - Records all service calls with persist flag set to true and runs the service calls after restart.
+  * Added element manager to manage element tree.
+    - Required to avoid issues with multithreaded access to element tree.
+    - Programming API change!
+  * Split iotcore super class into dedicated classes for separation of concern.
+    - Programming API change!
+  * Support strongly typed service element classes.
+  * Added read only and write only data element classes.
+  * Added simple data element classes.
+  * Send events in task to decouple sending events from event raised.
+
+B) Network adapters
+  * Added https server network adapter.
+  * Added mqtts server network adapter.
+  * Updated Visualizer to Version 2.25.225
+
+C) Profiles
+  * Added DeviceManagement profile to support ecomat, new basic and old basic controller.
+  * Enhanced iodd-extender profile.
+    - Create process data elements from processdatarefcollection or processdatacollection.
+    - Add iodd parameter metadata information to corresponding elements.
+    - Support iodd array type.
+    - Support iodd enumerated integer and float values ranges as element format.
+    - Added runcontrol profile to ioddextender profile.
+    - Added iodd condition reader cache.
+
+D) Code quality and documentation
+  * Added doxygen documentation to iotcore sdk nuget package.
+  * Added doxygen documentation for iotcore.common, iotcore.contracts and iotcore assemblies.
+  * Updated iotcore integration guide.
+  * Improve unit test code coverage and create unit test code coverage report.
+
+Bug fixes
+---------------------------------------------------------------------------------------------------
+
+
+
+
+***************************************************************************************************
+ifm IoTCore.NET
+2022.LTS Version 2.1.15
+Released 2023/01/11
+***************************************************************************************************
+ 
+What's new
+---------------------------------------------------------------------------------------------------
+
+Bug fixes
+---------------------------------------------------------------------------------------------------
+- Fixed bug where callback address for remote events was wrong
+
+
+
+***************************************************************************************************
+ifm IoTCore.NET
+2022.LTS Version 2.1.14
+Released 2023/01/11
+***************************************************************************************************
+ 
+What's new
+---------------------------------------------------------------------------------------------------
+- Make OPC UA Server create self-signed certificates on start configurable from configuration file
+- Visualizer is in separate file and as such individually updateable
+- Network profile now uses scripts for network configuration 
+
+Bug fixes
+---------------------------------------------------------------------------------------------------
+
+
+
+***************************************************************************************************
+ifm IoTCore.NET
+2022.LTS Version 2.1.12
+Released 2022/12/14
+***************************************************************************************************
+ 
+What's new
+---------------------------------------------------------------------------------------------------
+- Renamed resource assemblies to match culture string specification. (rename en-us to en-US)
+
+Bug fixes
+---------------------------------------------------------------------------------------------------
+
+
+
+***************************************************************************************************
+ifm IoTCore.NET
+2022.LTS Version 2.1.11
+Released 2022/11/02
+***************************************************************************************************
+ 
+What's new
+---------------------------------------------------------------------------------------------------
+- OPC UA Server does not create self-signed certificates on start
+
+Bug fixes
+---------------------------------------------------------------------------------------------------
+- Address "/" is accepted as address for root element
+- Trailing "/" in address is ignored
+
+
+***************************************************************************************************
+ifm IoTCore.NET
+2022.LTS Version 2.1.10
+Released 2022/10/11
+***************************************************************************************************
+ 
+What's new
+---------------------------------------------------------------------------------------------------
+
+Bug fixes
+---------------------------------------------------------------------------------------------------
+- Fixed remote service error handling in device management
+- Fixed read boolean values with enumeration from iodd extender over opc ua server
+- Check for delivery in http send event 
+
+
+
+***************************************************************************************************
+ifm IoTCore.NET
+2022.LTS Version 2.1.9
+Released 2022/10/07
+***************************************************************************************************
+ 
+What's new
+---------------------------------------------------------------------------------------------------
+- Remove data store from iotcore. All configuration is stored in app.config file. 
+  !!!NOTE that the constructor of the IoTCore now has one parameter less!!!
+
+Bug fixes
+---------------------------------------------------------------------------------------------------
+- Fixed bug when writing to pdout
+
+
+
+***************************************************************************************************
+ifm IoTCore.NET
+2022.LTS Version 2.1.7
+Released 202x/yy/zz
+***************************************************************************************************
+ 
+What's new
+---------------------------------------------------------------------------------------------------
+- Element addresses start with device name
+- Format and valuation classes are now strictly typed
+- ReadOnlyDataElement and WriteOnlyDataElement classes have been removed, because a data element can be 
+  made readable/writeable by adding the corresponding service
+
+Bug fixes
+---------------------------------------------------------------------------------------------------
+- Fixed bug where proxy data elements always had getdata and setdata service, no matter what the remote 
+  data element had.
+- Exceptions now contain error code and optional error information 
+
+
+
+***************************************************************************************************
+ifm IoTCore.NET
+2022.LTS Version 2.1.6
+Released 2022/07/27
+***************************************************************************************************
+								
+What's new
+---------------------------------------------------------------------------------------------------
+- IoTCore core modules
+  * Added element chache for fast element lookup 
+  * Added read only and write only data elements
+  * Added links to elements
+  * Introduced alternative names for standard services parameters
+  * Message data payload is now of type Variant
+  * Removed dependency to newtonsoft.Json
+  * Added JSON message converter based on System.Text.Json
+  * Added BSON message converter based on newtonsoft.Json
+  * Added support for configuration with configuration file
+  * Added extended error information in message data
+  * Harmonize API
+
+- OPC UA network adapter server
+  * Added support for IO-Link devices with IODDs
+  * Updates address space on a treechanged event from IoTCore element tree in background task
+  * Added support for server and client certificates
+  * Added support for configuration with configuration file
+
+- IODD-Extender profile
+  * Added Iodd management
+  * Run IODD extension in background task
+  * Run IODD extension on tree changed and IO-Link port events in background task
+
+- Network adapters
+  * Added websocket server and client network adapter 
+
+- Profiles
+  * Added "deviceinfo" profile
+  * Added "network" profile
+
+- IoTCore Visualizer
+  * Added updated version
+
+
+Known Issues 
+---------------------------------------------------------------------------------------------------
+
+- Websocket client network adapter
+  * Does not run stable. Do not use it
+
+
+
+***************************************************************************************************
+ifm IoTCore.NET
+Version 1.4.x
+Released 2021/06/30
+***************************************************************************************************
+ 
+								
+What's new
+---------------------------------------------------------------------------------------------------
+- OPC UA server network adapter according to IoTCore specification 
+- General fixes and enhancements to IoTCore
+- CANopen communication interface (netadapter) support
+- EcomatControllerUpdate profile support
+
+ Known Issues 
+---------------------------------------------------------------------------------------------------
+
+
+
+***************************************************************************************************
+ifm IoTCore.NET
+Version 1.2.x
+Released 2021/03/xx
+***************************************************************************************************
+								
+What's new
+---------------------------------------------------------------------------------------------------
+- Mqtt comminterface profile implementation
+- Mqtt commchannel profile implementation
+- Update Programming Guide & Class Reference for Mqtt Net Adapter
+- Programming Guide to mention how to use SendRequest and SendEvent of a network adapter client
+- General fixes and enhancements to IoTCore 
+
+ Known Issues 
+ --------------------------------------------------------------------------------------------------
+- Mqtt client does not evaluate response topic in reply adr
+- Event Notifications QoS Level (/connections/mqttconnection/mqttsetup/qos) defaults to QoS 0 (AtMostOnce).   
+
+
+
+***************************************************************************************************
+ifm IoTCore.NET
+Version 1.0.26
+Released 2020/06/xx
+***************************************************************************************************
+
+Created
+--------------------------------------------------------------------------------------------------
+Documentation created: IoTCore.Net Programming Guide.pdf
+		  
+								
+new Features
+--------------------------------------------------------------------------------------------------
+1. HTTP Network Adapter Communication
+ 
+2. Standard Device element Services
+   getidentity, gettree, querytree, getdatamulti, setdatamulti, getsubscriberlist
+ 
+3. Standard Data element Services
+   getdata, setdata
+   
+4. Standard Event element Services
+   subscribe, unsubscribe, triggerevent
+   
+5. Standard Events
+   treechanged, datachanged
+   
+Known Issues
+--------------------------------------------------------------------------------------------------

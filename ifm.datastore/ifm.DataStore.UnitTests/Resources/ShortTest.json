@@ -1,0 +1,60 @@
+{
+  "valid": {
+    "boolean": true,
+    "string1": "23",
+    "string2": "true",
+    "uint": 652000,
+    "int": -652000,
+    "ushort": 65200,
+    "short": -22200,
+    "double": 65.200,
+    "double1": 65.234,
+    "double2": -65.234,
+    "byte": 255,
+    "float": 65.200,
+    "float1": 65.234,
+    "float2": -65.234,
+    "intarray": [
+      1
+    ],
+    "intarrayempty": [],
+    "intarraynull": null,
+    "stringarray": [
+      ""
+    ],
+    "stringarrayempty": [],
+    "stringarraynull": null,
+    "complex": {
+      "MyInteger": -652000,
+      "MyUnsignedInteger": 652000,
+      "MyBoolean": true,
+      "MyByte": 255,
+      "MyDouble": 65.200,
+      "MyComplexType": {
+        "MyInteger": -652000,
+        "MyUnsignedInteger": 652000,
+        "MyBoolean": true,
+        "MyByte": 255,
+        "MyDouble": 65.200
+      }
+    }
+  },
+  "invalid": {
+    "boolean1": "true",
+    "boolean2": 23,
+    "string1": true,
+    "string2": 23,
+    "uint": 65.200,
+    "int": 65.200,
+    "ushort1": 652000,
+    "ushort2": -32200,
+    "short": 652000,
+    "double": true,
+    "double1": true,
+    "double2": true,
+    "float": true,
+    "float1": true,
+    "float2": true,
+    "byte": 257
+  }
+}

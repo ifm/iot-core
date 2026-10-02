@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyVersion>11.0.1</AssemblyVersion>
+    <Version>11.0.1</Version>
+    <Company>ifm ecomatic gmbh</Company>
+    <Product>ifm IoT-Core</Product>
+    <Description>The package contains the IoT-Core HTTP server network adapter interface.</Description>
+    <Copyright>Copyright © ifm ecomatic gmbh. All rights reserved.</Copyright>
+    <Authors>ESI Middleware</Authors>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>true</IsPackable>
+    <Nullable>enable</Nullable>
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+    <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="LICENSE.txt" />
+    <None Include="..\..\NOTICE.md" Pack="true" PackagePath="NOTICE.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\ifm.iotcore\source\ifm.IoTCore.NetAdapter.Contracts\ifm.IoTCore.NetAdapter.Contracts.csproj" />
+  </ItemGroup>
+</Project>

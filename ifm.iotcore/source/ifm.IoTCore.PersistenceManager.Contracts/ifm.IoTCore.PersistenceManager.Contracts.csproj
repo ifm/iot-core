@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFramework>netstandard2.0</TargetFramework>
+		<AssemblyVersion>6.1.0</AssemblyVersion>
+		<Version>6.1.0</Version>
+		<Company>ifm ecomatic gmbh</Company>
+		<Product>ifm IoT-Core</Product>
+		<Description>The package contains the IoT-Core persistence manager interface.</Description>
+		<Copyright>Copyright © ifm ecomatic gmbh. All rights reserved.</Copyright>
+		<Authors>ESI Middleware</Authors>
+		<LangVersion>latest</LangVersion>
+		<IsPackable>true</IsPackable>
+		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+		<PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+		<DebugType>embedded</DebugType>
+		<EmbedAllSources>true</EmbedAllSources>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(CI_BUILD)' == 'true'">
+		<ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+	</PropertyGroup>
+	<ItemGroup>
+		<None Include="..\..\LICENSE.txt" Pack="true" PackagePath="." />
+		<None Include="..\..\NOTICE.md" Pack="true" PackagePath="." />
+	</ItemGroup>
+	<ItemGroup>
+	  <ProjectReference Include="..\..\..\ifm.common\ifm.Common\ifm.Common.csproj" />
+	</ItemGroup>
+</Project>

@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <AssemblyVersion>1.1.3</AssemblyVersion>
+    <Version>1.1.3</Version>
+    <Company>ifm ecomatic gmbh</Company>
+    <Product>ifm DataStore</Product>
+    <Description>The package contains the data store.</Description>
+    <Copyright>Copyright © ifm ecomatic gmbh. All rights reserved.</Copyright>
+    <Authors>ESI Middleware</Authors>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>true</IsPackable>
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+    <DebugType>embedded</DebugType>
+    <EmbedAllSources>true</EmbedAllSources>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CI_BUILD)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="..\LICENSE.txt" Pack="true" PackagePath="LICENSE.txt" />
+    <None Include="..\NOTICE.md" Pack="true" PackagePath="NOTICE.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Text.Json" Version="10.0.9" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ifm.DataStore.Contracts\ifm.DataStore.Contracts.csproj" />
+  </ItemGroup>
+</Project>

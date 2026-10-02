@@ -1,0 +1,16 @@
+{
+  "ifm.IoTCore.NetAdapter.Http.Server.HttpServerNetAdapter": {
+    "VisualizerCompactOptions": {
+      "FilePath": "c:\\temp\\wwwroot\\full.ifm-iot-core-visualizer.html.gz",
+      "MappedPaths": [ "/browse", "/web/subscribe" ]
+    },
+    "VisualizerEnhancedOptions": {
+      "BasePath": "c:\\temp\\wwwroot\\ecologone",
+      "ClientRoutePrefix": "/ecologone",
+      "MappedPaths": "/"
+    },
+    "AllowedServicesOptions": {
+      "AllowedServices":  0
+    }
+  } 
+}

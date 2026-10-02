@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34330.188
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ifm.IoTCore.Profile.DeviceInfo", "source\ifm.IoTCore.Profile.DeviceInfo\ifm.IoTCore.Profile.DeviceInfo.csproj", "{B2BF31C9-1823-458F-9361-D15D4B0C0AFA}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B2BF31C9-1823-458F-9361-D15D4B0C0AFA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B2BF31C9-1823-458F-9361-D15D4B0C0AFA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B2BF31C9-1823-458F-9361-D15D4B0C0AFA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B2BF31C9-1823-458F-9361-D15D4B0C0AFA}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {CE901844-54E5-4F0A-A369-E0AF19ADA92A}
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFramework>netstandard2.0</TargetFramework>
+		<AssemblyVersion>1.0.2</AssemblyVersion>
+		<Version>1.0.2</Version>
+		<Company>ifm ecomatic gmbh</Company>
+		<Product>ifm IoT-Core</Product>
+		<Description>The package contains the IoT-Core device tag profile.</Description>
+		<Copyright>Copyright © ifm ecomatic gmbh. All rights reserved.</Copyright>
+		<Authors>ESI Middleware</Authors>
+		<LangVersion>latest</LangVersion>
+		<IsPackable>true</IsPackable>
+		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+		<PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+		<DebugType>embedded</DebugType>
+		<EmbedAllSources>true</EmbedAllSources>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(CI_BUILD)' == 'true'">
+		<ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+	</PropertyGroup>
+	<ItemGroup>
+		<None Include="..\LICENSE.txt" Pack="true" PackagePath="." />
+		<None Include="..\NOTICE.md" Pack="true" PackagePath="." />
+	</ItemGroup>
+	<ItemGroup>
+	  <ProjectReference Include="..\..\ifm.datastore\ifm.DataStore.Contracts\ifm.DataStore.Contracts.csproj" />
+	  <ProjectReference Include="..\..\ifm.iotcore\source\ifm.IoTCore.ElementManager.Contracts\ifm.IoTCore.ElementManager.Contracts.csproj" />
+	</ItemGroup>
+</Project>

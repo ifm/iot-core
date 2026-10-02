@@ -1,0 +1,75 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.5.11723.231
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{018D7570-9860-4F5B-92BD-E38BB5561D82}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ifm.IoTCore.NetAdapter.Http.Contracts", "source\ifm.IoTCore.NetAdapter.Http.Contracts\ifm.IoTCore.NetAdapter.Http.Contracts.csproj", "{1AD14BD2-118B-4100-9CB4-78A1EBE9DDD1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ifm.IoTCore.NetAdapter.Http.Profile.HttpServer.TestApplication", "tests\ifm.IoTCore.NetAdapter.Http.Profile.HttpServer.TestApplication\ifm.IoTCore.NetAdapter.Http.Profile.HttpServer.TestApplication.csproj", "{A8532FEF-285C-4B6C-9E7F-6DF293DEB36D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ifm.IoTCore.NetAdapter.Http.Server", "source\ifm.IoTCore.NetAdapter.Http.Server\ifm.IoTCore.NetAdapter.Http.Server.csproj", "{C8C2AB5D-5B81-41DA-B7CB-33DE34157FD8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ifm.IoTCore.NetAdapter.Http.Profile.HttpServer", "source\ifm.IoTCore.NetAdapter.Http.Profile.HttpServer\ifm.IoTCore.NetAdapter.Http.Profile.HttpServer.csproj", "{5499E768-8247-440B-9B8D-921AF528C481}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ifm.IoTCore.NetAdapter.Http.Profile.HttpServer.UnitTests", "tests\ifm.IoTCore.NetAdapter.Http.Profile.HttpServer.UnitTests\ifm.IoTCore.NetAdapter.Http.Profile.HttpServer.UnitTests.csproj", "{6EFF642F-B82C-4BDB-A3B9-719A8156D541}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ifm.IoTCore.NetAdapter.Http.Client", "source\ifm.IoTCore.NetAdapter.Http.Client\ifm.IoTCore.NetAdapter.Http.Client.csproj", "{3D4B96C0-8BED-4354-A72E-B4A85F47E711}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ifm.IoTCore.NetAdapter.Http.Server.UnitTests", "tests\ifm.IoTCore.NetAdapter.Http.Server.UnitTests\ifm.IoTCore.NetAdapter.Http.Server.UnitTests.csproj", "{CCBEF281-5655-442A-B7A6-CEE9CBD04AEF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestApplication.Websockets", "tests\TestApplication.Websockets\TestApplication.Websockets.csproj", "{A353DB9C-8024-C9D1-58C7-542D8FB3F181}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1AD14BD2-118B-4100-9CB4-78A1EBE9DDD1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1AD14BD2-118B-4100-9CB4-78A1EBE9DDD1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1AD14BD2-118B-4100-9CB4-78A1EBE9DDD1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1AD14BD2-118B-4100-9CB4-78A1EBE9DDD1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A8532FEF-285C-4B6C-9E7F-6DF293DEB36D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A8532FEF-285C-4B6C-9E7F-6DF293DEB36D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A8532FEF-285C-4B6C-9E7F-6DF293DEB36D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A8532FEF-285C-4B6C-9E7F-6DF293DEB36D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C8C2AB5D-5B81-41DA-B7CB-33DE34157FD8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C8C2AB5D-5B81-41DA-B7CB-33DE34157FD8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C8C2AB5D-5B81-41DA-B7CB-33DE34157FD8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C8C2AB5D-5B81-41DA-B7CB-33DE34157FD8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5499E768-8247-440B-9B8D-921AF528C481}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5499E768-8247-440B-9B8D-921AF528C481}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5499E768-8247-440B-9B8D-921AF528C481}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5499E768-8247-440B-9B8D-921AF528C481}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6EFF642F-B82C-4BDB-A3B9-719A8156D541}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6EFF642F-B82C-4BDB-A3B9-719A8156D541}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6EFF642F-B82C-4BDB-A3B9-719A8156D541}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6EFF642F-B82C-4BDB-A3B9-719A8156D541}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3D4B96C0-8BED-4354-A72E-B4A85F47E711}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3D4B96C0-8BED-4354-A72E-B4A85F47E711}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3D4B96C0-8BED-4354-A72E-B4A85F47E711}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3D4B96C0-8BED-4354-A72E-B4A85F47E711}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CCBEF281-5655-442A-B7A6-CEE9CBD04AEF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CCBEF281-5655-442A-B7A6-CEE9CBD04AEF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CCBEF281-5655-442A-B7A6-CEE9CBD04AEF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CCBEF281-5655-442A-B7A6-CEE9CBD04AEF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A353DB9C-8024-C9D1-58C7-542D8FB3F181}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A353DB9C-8024-C9D1-58C7-542D8FB3F181}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A353DB9C-8024-C9D1-58C7-542D8FB3F181}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A353DB9C-8024-C9D1-58C7-542D8FB3F181}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{A8532FEF-285C-4B6C-9E7F-6DF293DEB36D} = {018D7570-9860-4F5B-92BD-E38BB5561D82}
+		{6EFF642F-B82C-4BDB-A3B9-719A8156D541} = {018D7570-9860-4F5B-92BD-E38BB5561D82}
+		{CCBEF281-5655-442A-B7A6-CEE9CBD04AEF} = {018D7570-9860-4F5B-92BD-E38BB5561D82}
+		{A353DB9C-8024-C9D1-58C7-542D8FB3F181} = {018D7570-9860-4F5B-92BD-E38BB5561D82}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {42FC25A7-3816-4E70-AAF5-3A8B3983FC96}
+	EndGlobalSection
+EndGlobal

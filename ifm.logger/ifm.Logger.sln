@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.9.34902.65
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ifm.Logger.Contracts", "ifm.Logger.Contracts\ifm.Logger.Contracts.csproj", "{F28C6812-E32D-43AA-8A91-D585B1DA91AD}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ifm.Logger", "ifm.Logger\ifm.Logger.csproj", "{EBEDC38C-E3EB-4606-9919-93166161F578}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F28C6812-E32D-43AA-8A91-D585B1DA91AD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F28C6812-E32D-43AA-8A91-D585B1DA91AD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F28C6812-E32D-43AA-8A91-D585B1DA91AD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F28C6812-E32D-43AA-8A91-D585B1DA91AD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EBEDC38C-E3EB-4606-9919-93166161F578}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EBEDC38C-E3EB-4606-9919-93166161F578}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EBEDC38C-E3EB-4606-9919-93166161F578}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EBEDC38C-E3EB-4606-9919-93166161F578}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {35FA39E7-97B1-4093-BC5C-A7EB2BD6761B}
+	EndGlobalSection
+EndGlobal

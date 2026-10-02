@@ -1,0 +1,2 @@
+[HttpServerNetAdapter.cs]
+dotnet_diagnostic.CS0067.severity = none

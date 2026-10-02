@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyVersion>2.0.1</AssemblyVersion>
+    <Version>2.0.1</Version>
+    <Company>ifm ecomatic gmbh</Company>
+    <Product>ifm IoT-Core</Product>
+    <Description>The package contains the IoT-Core HTTP client network adapter.</Description>
+    <Copyright>Copyright © ifm ecomatic gmbh. All rights reserved.</Copyright>
+    <Authors>ESI Middleware</Authors>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>true</IsPackable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+    <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="LICENSE.txt" />
+    <None Include="..\..\NOTICE.md" Pack="true" PackagePath="NOTICE.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\ifm.common\ifm.Common\ifm.Common.csproj" />
+    <ProjectReference Include="..\..\..\ifm.iotcore\source\ifm.IoTCore.Common\ifm.IoTCore.Common.csproj" />
+    <ProjectReference Include="..\..\..\ifm.iotcore\source\ifm.IoTCore.MessageConverter.Contracts\ifm.IoTCore.MessageConverter.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\ifm.iotcore\source\ifm.IoTCore.Message\ifm.IoTCore.Message.csproj" />
+    <ProjectReference Include="..\..\..\ifm.iotcore\source\ifm.IoTCore.NetAdapter.Contracts\ifm.IoTCore.NetAdapter.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\ifm.logger\ifm.Logger.Contracts\ifm.Logger.Contracts.csproj" />
+  </ItemGroup>
+</Project>
